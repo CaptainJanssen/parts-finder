@@ -1,6 +1,6 @@
 /* Parts Finder app: keeps the app itself on the device so it opens without internet.
    Your data is not handled here; the page keeps it in its own storage and syncs it with your database. */
-const VERSION = "9abd3a33277f";
+const VERSION = "395ce6e4e144";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "lib/pdf-lib.min.js", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 const SHELL_CACHE = "pf-shell-" + VERSION;
 const EXTRA_CACHE = "pf-extra";   // fonts and the Excel library, kept once used

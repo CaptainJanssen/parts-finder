@@ -1042,9 +1042,10 @@ const Backend = (() => {
       // send what changed here
       while (outbox.size) {
         const keys = [...outbox.keys()].slice(0, 400);
-        const rows = keys.map((k) => { const r = recs.get(k); return { kind: r.kind, id: r.id, data: r.data, deleted: r.deleted, updated: r.updated || OLD }; });
+        // as UTC: the database would read a time without a zone (older PC records) as UTC instead of local time
+        const rows = keys.map((k) => { const r = recs.get(k); return { kind: r.kind, id: r.id, data: r.data, deleted: r.deleted, updated: tt(r.updated) ? new Date(tt(r.updated)).toISOString() : OLD }; });
         await C.rest("POST", "/rest/v1/rpc/push_records", { rows });
-        keys.forEach((k, i) => { if (outbox.get(k) === rows[i].updated) outbox.delete(k); });
+        keys.forEach((k, i) => { if (tt(outbox.get(k)) === tt(rows[i].updated)) outbox.delete(k); });
         await C.put("kv", Object.fromEntries(outbox), "outbox");
       }
       // fetch what changed elsewhere (a little overlap, so nothing slips between two fetches)
