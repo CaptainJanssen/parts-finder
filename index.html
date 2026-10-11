@@ -3966,6 +3966,22 @@ if (navigator.maxTouchPoints > 0) {
   // iPad and iPhone ignore "no zooming" in the page settings, so a pinch is stopped here
   ["gesturestart", "gesturechange", "gestureend"].forEach((t) => document.addEventListener(t, (ev) => ev.preventDefault(), { passive: false }));
   document.addEventListener("touchmove", (ev) => { if (ev.touches.length > 1 && !ev.target.closest(".dvstage")) ev.preventDefault(); }, { passive: false });
+  // When the keyboard opens, iPad and iPhone move the whole page up to show the field, and after it closes the page can
+  // stay moved: then every tap lands a field lower than it looks. The page itself never scrolls (only the lists and
+  // forms inside it do), so as soon as nothing is being typed in, it is put back.
+  const typing = () => { const a = document.activeElement; return !!a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable); };
+  const settle = () => {
+    if (typing()) return;
+    if (window.scrollY || window.scrollX || document.documentElement.scrollTop || document.body.scrollTop) {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  };
+  document.addEventListener("focusout", () => { setTimeout(settle, 80); setTimeout(settle, 400); });
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", () => { setTimeout(settle, 80); setTimeout(settle, 400); });
+  window.addEventListener("scroll", () => { if (!typing()) requestAnimationFrame(settle); }, { passive: true });
+  window.addEventListener("orientationchange", () => setTimeout(settle, 300));
 }
 Backend.init(H).then(() => {
   if ($("syncbtn")) $("syncbtn").hidden = !!(Backend.local && Backend.remote);

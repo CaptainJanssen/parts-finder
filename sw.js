@@ -1,6 +1,6 @@
 /* Parts Finder app: keeps the app itself on the device so it opens without internet.
    Your data is not handled here; the page keeps it in its own storage and syncs it with your database. */
-const VERSION = "7d3b0716c997";
+const VERSION = "982a6bacb116";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 const SHELL_CACHE = "pf-shell-" + VERSION;
 // the libraries (PDF, barcodes, text reading) stay across app updates; a new name here fetches them again
