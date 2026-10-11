@@ -433,6 +433,18 @@ table.occ tr:last-child td { border-bottom: 0; }
 .qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .qty button { border: 0; background: var(--surface-2); width: 32px; height: 32px; cursor: pointer; font-size: 16px; }
 .qty input { width: 46px; text-align: center; border: 0; background: var(--surface); height: 32px; font-family: var(--f-mono); }
+/* stock form: quantity counter (no typing) and extra location / aircraft entries for part of a batch */
+.qty button:disabled { opacity: .35; cursor: default; }
+.qty output { min-width: 34px; text-align: center; font-family: var(--f-mono); font-weight: 600; color: var(--ink); }
+.qty.big { display: flex; height: 40px; background: var(--surface-2); }
+.qty.big button { width: 54px; height: auto; font-size: 21px; color: var(--ink); }
+.qty.big output { flex: 1; align-self: center; font-size: 16px; }
+.xmain { font-size: 13.5px; font-weight: 600; color: var(--ink); margin-bottom: -4px; }
+.xent { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; margin-top: 12px; }
+.xhead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13.5px; font-weight: 600; }
+.xhead .qty button { width: 36px; height: 34px; font-size: 17px; color: var(--ink); }
+.xhead .sp { flex: 1; }
+#sf-addx { margin-top: 12px; }
 .listactions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 /* Orders page */
 .muted { color: var(--muted); }
@@ -1758,12 +1770,12 @@ function openStockForm(item, returnTo) {
   const isDraft = base.status === "draft";
   // booking in: parts for a customer order are reserved for that customer, the rest go into stock
   if (isDraft) base.status = base.order ? "reserved" : "stock";
-  SF = { item: base, isNew, isDraft, returnTo: returnTo ?? null, delArm: false };
+  SF = { item: base, isNew, isDraft, returnTo: returnTo ?? null, delArm: false, qty: base.qty, extra: [] };
   $("detail").hidden = true; $("msgsheet").hidden = true;
   renderStockForm();
   $("stocksheet").hidden = false;
   $("scrim").hidden = false;
-  setTimeout(() => { const f = isNew && !base.pn ? $("sf-pn") : $("sf-qty"); f && f.focus(); }, 30);
+  setTimeout(() => { if (isNew && !base.pn) $("sf-pn").focus(); }, 30);
 }
 function renderStockForm() {
   const it = SF.item;
@@ -1778,7 +1790,7 @@ function renderStockForm() {
     '<label class="field full" for="sf-pn"><span class="req">Part number</span><input id="sf-pn" class="m" value="' + esc(it.pn) + '" placeholder="Part number or name"' + ro + '><div id="sf-sugg"></div><div id="sf-pninfo">' + (it.pn ? (known ? '<span class="pnok">✓ In the IPC catalogue (' + esc(acsOf(it.pn).map(acShort).join(", ")) + ")</span>" : '<span class="pnwarn">Not in the IPC catalogue</span>') : "") + "</div></label>" +
     '<label class="field full" for="sf-desc">Description<input id="sf-desc" value="' + esc(it.desc) + '"' + ro + "></label>" +
     '<label class="field full" for="sf-ac">Aircraft type<select id="sf-ac"' + ro + '><option value="">Not set</option>' + opt(AC_OPTIONS, it.ac) + "</select></label>" +
-    '<label class="field" for="sf-qty"><span class="req">Quantity</span><input id="sf-qty" class="m" inputmode="numeric" value="' + esc(it.qty) + '"' + ro + "></label>" +
+    '<div class="field"><span class="req">Quantity</span><span class="qty big"><button type="button" data-sfq="-1" aria-label="Fewer"' + ro + '>−</button><output id="sf-qty" aria-live="polite">' + esc(SF.qty) + '</output><button type="button" data-sfq="1" aria-label="More"' + ro + ">+</button></span></div>" +
     '<label class="field" for="sf-status">Status<select id="sf-status"' + ro + ">" + opt(STATUSES, it.status) + "</select></label>" +
     "</div></div>" +
     '<div class="sec"><h4>Condition</h4><div class="formgrid">' +
@@ -1787,11 +1799,12 @@ function renderStockForm() {
     '<label class="field full" for="sf-condnote">Condition notes<input id="sf-condnote" value="' + esc(it.condNote) + '"' + ro + "></label>" +
     "</div></div>" +
     '<div class="sec"><h4>Location and origin</h4><div class="formgrid">' +
+    '<div class="full xmain" id="sf-mainn" hidden></div>' +
     '<label class="field" for="sf-serial">Serial number<input id="sf-serial" class="m" value="' + esc(it.serial) + '"' + ro + "></label>" +
     '<label class="field" for="sf-loc">Location<input id="sf-loc" list="sf-locs" value="' + esc(it.loc) + '"' + ro + '><datalist id="sf-locs">' + locs.map((l) => '<option value="' + esc(l) + '">').join("") + "</datalist></label>" +
     '<label class="field" for="sf-from">Removed from aircraft<input id="sf-from" list="sf-froms" value="' + esc(it.from) + '" placeholder="Registration or MSN"' + ro + '><datalist id="sf-froms">' + froms.map((l) => '<option value="' + esc(l) + '">').join("") + "</datalist></label>" +
     '<label class="field" for="sf-received">Date received<input id="sf-received" type="date" value="' + esc(it.received) + '"' + ro + "></label>" +
-    "</div></div>" +
+    '</div><div id="sf-extra"></div>' + (Backend.canWrite ? '<button class="btn" type="button" id="sf-addx" hidden>+ Add entry</button>' : "") + "</div>" +
     '<div class="sec"><h4>Price per unit</h4><div class="formgrid">' +
     '<label class="field" for="sf-buy">Bought for (€)<input id="sf-buy" class="m" inputmode="decimal" value="' + esc(money(it.buy)) + '" placeholder="0,00"' + ro + "></label>" +
     '<label class="field" for="sf-sell">Asking price (€)<input id="sf-sell" class="m" inputmode="decimal" value="' + esc(money(it.sell)) + '" placeholder="0,00"' + ro + "></label>" +
@@ -1805,6 +1818,46 @@ function renderStockForm() {
     '<div class="formactions">' + (Backend.canWrite ? '<button class="btn primary" type="submit">' + (SF.isDraft ? "Save to warehouse" : "Save") + "</button>" + (SF.isNew ? '<button class="btn" type="button" id="sf-saveadd">Save &amp; add another</button>' : "") : "") +
     '<button class="btn" type="button" data-close>Cancel</button><span class="spacer"></span>' +
     (!SF.isNew && Backend.canWrite ? '<button class="btn danger" type="button" id="sf-delete">' + (SF.isDraft ? "Discard" : "Delete") + "</button>" : "") + "</div></form>";
+  sfDraw();
+}
+// Quantity counter (− and +), and extra entries when part of a batch sits elsewhere or came from another aircraft.
+// The first location takes the units the extra entries leave; each entry is saved as its own stock item.
+const sfMain = () => SF.qty - SF.extra.reduce((s, x) => s + x.n, 0);
+function sfKeep() {
+  document.querySelectorAll("#sf-extra [data-xf]").forEach((el) => { const x = SF.extra[+el.dataset.x]; if (x) x[el.dataset.xf] = el.value; });
+}
+function sfDraw() {
+  const ro = Backend.canWrite ? "" : " disabled";
+  const main = sfMain();
+  const units = (n) => n + (n === 1 ? " unit" : " units");
+  $("sf-qty").value = String(SF.qty);
+  const dn = $("stocksheet").querySelector('[data-sfq="-1"]');
+  if (dn && !ro) dn.disabled = main <= 1 && !SF.extra.some((x) => x.n > 1);
+  $("sf-mainn").hidden = !SF.extra.length;
+  $("sf-mainn").textContent = units(main);
+  if ($("sf-addx")) $("sf-addx").hidden = main < 2;
+  $("sf-extra").innerHTML = SF.extra.map((x, i) => '<div class="xent"><div class="xhead"><span class="qty"><button type="button" data-xq="-1" data-x="' + i + '" aria-label="Fewer"' + (ro || (x.n <= 1 ? " disabled" : "")) + ">−</button><output>" + x.n + '</output><button type="button" data-xq="1" data-x="' + i + '" aria-label="More"' + (ro || (main <= 1 ? " disabled" : "")) + ">+</button></span>" +
+    (x.n === 1 ? "unit" : "units") + '<span class="sp"></span>' + (ro ? "" : '<button class="xbtn" type="button" data-xdel="' + i + '" aria-label="Remove entry">×</button>') + '</div><div class="formgrid">' +
+    '<label class="field">Serial number<input class="m" data-x="' + i + '" data-xf="serial" value="' + esc(x.serial) + '"' + ro + "></label>" +
+    '<label class="field">Location<input list="sf-locs" data-x="' + i + '" data-xf="loc" value="' + esc(x.loc) + '"' + ro + "></label>" +
+    '<label class="field">Removed from aircraft<input list="sf-froms" data-x="' + i + '" data-xf="from" value="' + esc(x.from) + '" placeholder="Registration or MSN"' + ro + "></label>" +
+    "</div></div>").join("");
+}
+function sfStep(kind, i, d) {
+  if (!Backend.canWrite) return;
+  sfKeep();
+  const main = sfMain();
+  if (kind === "qty") {
+    if (d > 0) SF.qty = Math.min(999, SF.qty + 1);
+    else if (main > 1) SF.qty--;
+    else { const x = [...SF.extra].reverse().find((y) => y.n > 1); if (x) { x.n--; SF.qty--; } }
+  } else if (kind === "x") {
+    const x = SF.extra[i];
+    if (x && d > 0 && main > 1) x.n++;
+    else if (x && d < 0 && x.n > 1) x.n--;
+  } else if (kind === "add") { if (main > 1) SF.extra.push({ n: 1, serial: "", loc: "", from: "" }); }
+  else if (kind === "del") SF.extra.splice(i, 1);
+  sfDraw();
 }
 function readStockForm() {
   const it = { ...SF.item };
@@ -1812,7 +1865,7 @@ function readStockForm() {
   it.pn = v("sf-pn").trim().toUpperCase().replace(/\s+/g, "-");
   it.desc = v("sf-desc").trim();
   it.ac = v("sf-ac");
-  it.qty = parseInt(v("sf-qty"), 10);
+  it.qty = sfMain();
   it.status = v("sf-status");
   it.cond = v("sf-cond"); it.grade = v("sf-grade"); it.condNote = v("sf-condnote").trim();
   it.serial = v("sf-serial").trim(); it.loc = v("sf-loc").trim(); it.from = v("sf-from").trim().toUpperCase(); it.received = v("sf-received");
@@ -1824,17 +1877,28 @@ function readStockForm() {
 function saveStockForm(addAnother) {
   const it = readStockForm();
   if (!it.pn) { toast("Enter a part number."); $("sf-pn").focus(); return; }
-  if (!Number.isInteger(it.qty) || it.qty < 1) { toast("Enter a quantity of 1 or more."); $("sf-qty").focus(); return; }
+  if (!Number.isInteger(it.qty) || it.qty < 1) { toast("Set a quantity of 1 or more."); return; }
   for (const [f, id] of [["buy", "sf-buy"], ["sell", "sf-sell"], ["soldPrice", "sf-soldprice"]]) {
     if (Number.isNaN(it[f])) { toast("Enter a price like 125 or 125,50."); $(id).focus(); return; }
   }
   if (it.status === "sold" && !it.soldDate) it.soldDate = today();
   if (byPn.has(it.pn)) { const e = entryOf(it.pn, it.ac); if (!it.desc) it.desc = e.d; if (!it.ac) it.ac = e.ac; }
+  // extra entries become their own stock items; entries with the same serial, location and aircraft are joined
+  sfKeep();
+  const where = (x) => [x.serial, x.loc, x.from].join("\u0001");
+  const extra = [];
+  for (const x of SF.extra) {
+    const e = { n: x.n, serial: x.serial.trim(), loc: x.loc.trim(), from: x.from.trim().toUpperCase() };
+    if (where(e) === where(it)) { it.qty += e.n; continue; }
+    const same = extra.find((y) => where(y) === where(e));
+    if (same) same.n += e.n; else extra.push(e);
+  }
   putStock(it);
+  for (const e of extra) putStock({ ...it, id: newId(), qty: e.n, serial: e.serial, loc: e.loc, from: e.from, created: "" });
   toast(SF.isNew || SF.isDraft ? "Added " + it.pn + " to the warehouse" : "Saved " + it.pn);
   if (addAnother) {
     const next = { ...it, id: newId(), serial: "", notes: "", condNote: "", qty: 1, status: "stock", soldPrice: null, soldDate: "", customer: "", created: "", updated: "" };
-    SF = { item: normStock(next), isNew: true, returnTo: SF.returnTo, delArm: false };
+    SF = { item: normStock(next), isNew: true, returnTo: SF.returnTo, delArm: false, qty: 1, extra: [] };
     renderStockForm();
     $("sf-serial").focus();
     renderStock(); render();
@@ -1855,7 +1919,7 @@ function pickSuggestion(pn, ac) {
   if (!$("sf-sell").value && r.sell != null) $("sf-sell").value = money(r.sell);
   $("sf-sugg").innerHTML = "";
   $("sf-pninfo").innerHTML = '<span class="pnok">✓ In the IPC catalogue (' + esc(acsOf(pn).map(acShort).join(", ")) + ")</span>";
-  $("sf-qty").focus();
+  $("sf-pn").blur();   // the keyboard closes, so the quantity counter is in view
 }
 
 /* ---------- Detail sheet ---------- */
@@ -3863,6 +3927,13 @@ document.addEventListener("click", (ev) => {
   if (t.closest("[data-close]")) { const back = SF && SF.returnTo; closeSheets(); if (back != null) openDetail(back); return; }
   if (t.id === "d-addstock" && S.sel != null) { openStockForm({ pn: P[S.sel].p, ac: P[S.sel].ac }, S.sel); return; }
   if (t.id === "sf-saveadd") { saveStockForm(true); return; }
+  const sq = t.closest("[data-sfq]");
+  if (sq) { sfStep("qty", 0, +sq.dataset.sfq); return; }
+  const xq = t.closest("[data-xq]");
+  if (xq) { sfStep("x", +xq.dataset.x, +xq.dataset.xq); return; }
+  const xd = t.closest("[data-xdel]");
+  if (xd) { sfStep("del", +xd.dataset.xdel, 0); return; }
+  if (t.id === "sf-addx") { sfStep("add", 0, 0); return; }
   if (t.id === "sf-delete") {
     const word = SF.isDraft ? "Discard" : "Delete";
     if (!SF.delArm) { SF.delArm = true; t.textContent = "Confirm " + word.toLowerCase(); setTimeout(() => { if (SF && SF.delArm) { SF.delArm = false; const b = $("sf-delete"); if (b) b.textContent = word; } }, 4000); return; }
