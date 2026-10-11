@@ -2737,20 +2737,18 @@ function makeDraft(x, o) {
     received: today(), buy: r.buy ?? null, sell: line && line.sell != null ? line.sell : askingFor(x.pn),
     customer: o ? o.customer : "", order: o ? o.no : "" });
 }
+// what goes to the dismantler: part number, description, aircraft, how many and the alternate part numbers - nothing else
+// (no order codes, prices or customers). A part wanted for several orders is one line with the quantities added up.
 function dismRows(key, only) {
-  const out = [];
+  const by = new Map();
   dismGroups("todo").filter((g) => key === "all" || g.key === key).forEach((g) => g.items.filter((x) => !only || !only.size || only.has(x.k)).forEach((x) => {
     const e = entryOf(x.pn, x.ac);
-    const o = e ? e.o[0] : null;
-    const f = o ? FIGS[o[0]] : null;
-    out.push({
-      "Our reference": g.key === "stock" ? "Stock" : g.label, "Part number": x.pn, "Description": x.desc,
-      "Aircraft": x.ac ? acName(x.ac) : acsOf(x.pn).map(acName).join(", "), "Qty wanted": x.qty,
-      "Alternate part numbers": e ? (e.a || []).join(", ") : "", "Used in": e ? e.mainParent : "",
-      "IPC figure": f ? f[0] : "", "IPC item": o ? o[1] : "", "IPC section": f ? f[2] + " " + secTitle(e.ac, f[2]) : "",
-    });
+    const ac = x.ac ? acName(x.ac) : acsOf(x.pn).map(acName).join(", ");
+    const k = x.pn + "|" + ac;
+    if (by.has(k)) { by.get(k)["Qty wanted"] += x.qty; return; }
+    by.set(k, { "Part number": x.pn, "Description": x.desc, "Aircraft": ac, "Qty wanted": x.qty, "Alternate part numbers": e ? (e.a || []).join(", ") : "" });
   }));
-  return out;
+  return [...by.values()];
 }
 function orderRows(o) {
   return o.lines.map((l) => ({ "Part number": l.pn, "Description": lineDesc(l), "Aircraft": acName(l.ac), "Qty": l.qty,
@@ -2894,7 +2892,7 @@ function orderClick(t) {
     return true;
   }
   if ((b = q("[data-dexport]"))) { const key = b.dataset.dexport; const g = key === "all" ? null : dismGroups("todo").find((x) => x.key === key); doExport(dismRows(key, key === "all" ? L.dsel : null), "Request", "Request " + (g ? g.label : "dismantler")); return true; }
-  if ((b = q("[data-dcopy]"))) { copyText(dismRows("all", L.dsel).map((r) => r["Our reference"] + "\t" + r["Part number"] + "\t" + r["Description"] + "\tqty " + r["Qty wanted"]).join("\n")); return true; }
+  if ((b = q("[data-dcopy]"))) { copyText(dismRows("all", L.dsel).map((r) => [r["Part number"], r["Description"], r["Aircraft"], "qty " + r["Qty wanted"], r["Alternate part numbers"] ? "alt. " + r["Alternate part numbers"] : ""].filter(Boolean).join("\t")).join("\n")); return true; }
   // picking parts: the checkbox, a whole group, everything, or a click anywhere on the line
   if ((b = q("[data-dselclear]"))) { L.dsel.clear(); renderOrders(); return true; }
   if ((b = q("[data-dselg]"))) {
