@@ -470,7 +470,7 @@ table.occ tr:last-child td { border-bottom: 0; }
 /* Orders page */
 .muted { color: var(--muted); }
 .tile .v .u { font-size: 14px; font-weight: 500; color: var(--muted); }
-.obar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-top: 14px; }
+.obar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-top: 20px; }
 .obar .spacer { flex: 1; }
 .otabs { display: inline-flex; gap: 3px; background: var(--surface-2); border: 1px solid var(--line); padding: 3px; border-radius: 9px; }
 .otabs button { border: 0; background: transparent; padding: 8px 16px; border-radius: 7px; font-family: var(--f-display); text-transform: uppercase; letter-spacing: .1em; font-size: 13px; color: var(--muted); cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
@@ -547,6 +547,8 @@ table.occ tr:last-child td { border-bottom: 0; }
 .rchip.sent { color: var(--focus); border-color: color-mix(in srgb, var(--focus) 45%, transparent); }
 .rchip.in { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: var(--good-bg); }
 .oadd { padding: 10px 14px; display: grid; gap: 6px; border-top: 1px solid var(--line); }
+.olines > .oadd:first-child { border-top: 0; }
+.olines > .oadd:first-child:not(:last-child) { border-bottom: 1px solid var(--line); }
 .olines .oline:last-of-type { border-bottom: 0; }
 .oadd input { border: 1px dashed var(--line); background: var(--surface-2); border-radius: 6px; padding: 9px 11px; font-size: 14.5px; color: var(--ink); width: 100%; }
 .oadd input:focus { border-style: solid; border-color: var(--focus); outline: none; background: var(--surface); }
@@ -846,7 +848,6 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
 
   <section id="view-orders" class="view" role="tabpanel" aria-labelledby="tab-orders" hidden>
     <div class="fixedtop">
-    <div class="tiles" id="otiles"></div>
     <div class="obar">
       <div class="otabs" role="tablist" aria-label="Orders">
         <button type="button" role="tab" data-ltab="orders" aria-selected="true">Customer orders <span class="n" id="on-open">0</span></button>
@@ -2500,14 +2501,6 @@ function renderOrders() {
   const all = [...orders.values()];
   const open = all.filter(isOpenOrder);
   const toReq = toRequestCount();
-  const onTheWay = dismGroups("sent").reduce((s, g) => s + g.items.reduce((t, x) => t + x.qty, 0), 0);
-  const waiting = open.filter((o) => o.status === "waiting").length, ready = open.filter((o) => o.status === "ready").length;
-  const tile = (k, v, s, cls) => '<div class="tile"><div class="k">' + k + '</div><div class="v' + (cls ? " " + cls : "") + '">' + v + "</div>" + (s ? '<div class="s">' + s + "</div>" : "") + "</div>";
-  $("otiles").innerHTML =
-    tile("Open orders", open.length, waiting ? waiting + " waiting for parts" : "") +
-    tile("Ready to ship", ready, "") +
-    tile("To request", toReq + '<span class="u"> part' + (toReq === 1 ? "" : "s") + "</span>", onTheWay ? onTheWay + " on the way" : "") +
-    tile("Value of open orders", esc(EUR0.format(open.reduce((s, o) => s + orderTotal(o), 0))), "");
   document.querySelectorAll("[data-ltab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.ltab === L.tab)));
   $("on-open").textContent = open.length;
   $("on-dism").textContent = toReq;
@@ -2630,9 +2623,9 @@ function orderDetail(o, ro) {
     f("vatNo", "Customer VAT no.") +
     '<label class="field">VAT<select data-of="vat" data-oid="' + id + '"' + dis + ">" + VAT_MODES().map(([k, v]) => '<option value="' + k + '"' + (o.vat === k ? " selected" : "") + ">" + esc(v) + "</option>").join("") + "</select></label>" +
     '<label class="field">Shipping (€)<input class="m" inputmode="decimal" data-oship="1" data-oid="' + id + '" value="' + esc(money(o.shipping)) + '" placeholder="0,00"' + dis + "></label></div>" +
-    '<div class="olines">' + (o.lines.length ? '<div class="olhdr" aria-hidden="true"><span>Part number</span><span>Description</span><span>Status</span><span>Qty</span><span class="r">€ each</span><span class="r">Total</span><span></span></div>' + lines
-      : "") +
-    (ro ? "" : '<div class="oadd"><input id="oadd-input" data-oadd="' + id + '" autocomplete="off" placeholder="Add a part"><div id="oadd-sugg"></div></div>') +
+    // "Add a part" sits above the parts of the order
+    '<div class="olines">' + (ro ? "" : '<div class="oadd"><input id="oadd-input" data-oadd="' + id + '" autocomplete="off" placeholder="Add a part"><div id="oadd-sugg"></div></div>') +
+    (o.lines.length ? '<div class="olhdr" aria-hidden="true"><span>Part number</span><span>Description</span><span>Status</span><span>Qty</span><span class="r">€ each</span><span class="r">Total</span><span></span></div>' + lines : "") +
     (o.lines.length ? ototalHtml(o) : "") + "</div>" +
     '<label class="field onotes">Notes<textarea rows="2" data-of="notes" data-oid="' + id + '"' + dis + ">" + esc(o.notes) + "</textarea></label>" +
     (ro ? "" : '<div class="listactions" style="margin:14px 0 4px">' +
