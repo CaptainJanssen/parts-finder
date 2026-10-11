@@ -482,8 +482,10 @@ table.occ tr:last-child td { border-bottom: 0; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .dbar { padding-top: 12px; }
 .addbox { position: relative; flex: 1 1 280px; }
-.dropsugg { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; box-shadow: var(--shadow); border-radius: 6px; max-height: 340px; overflow-y: auto; }
-.dropsugg .sugg { border-radius: 6px; }
+/* "Add a part" on the To dismantler tab: looks like the search box, opens the parts window */
+.daddbtn { display: block; width: 100%; text-align: left; color: var(--muted); cursor: pointer; }
+.daddbtn:hover { border-color: var(--muted); color: var(--ink); }
+.pk-n.sent { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: var(--good-bg); }
 #olist { padding-top: 6px; }
 .onew { padding: 16px 18px 18px; margin-bottom: 16px; }
 .onewh { margin: 0 0 4px; font-family: var(--f-display); font-weight: 500; font-size: 17px; letter-spacing: .04em; }
@@ -891,8 +893,7 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
       <div class="searchrow">
       <div class="searchbox addbox rwonly">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
-        <input id="dadd" class="bigsearch" type="search" autocomplete="off" spellcheck="false" placeholder="Add a part" aria-label="Add a part to request for stock">
-        <div id="dadd-sugg" class="dropsugg" hidden></div>
+        <button id="dadd" class="bigsearch daddbtn" type="button" data-dpicker aria-label="Add a part to request for stock">Add a part</button>
       </div>
       <button class="btn bigbtn dact" type="button" data-dexport="all" id="d-export">Export</button><button class="btn bigbtn dact" type="button" data-dcopy="all" id="d-copy">Copy</button><button class="btn primary bigbtn dact rwonly" type="button" data-dsent="sel" id="d-mark">Mark requested</button>
       </div>
@@ -2779,13 +2780,14 @@ function detailOrderHtml(e) {
     '<div class="listactions"><select id="d-ord" aria-label="Customer order">' + open.map((o) => '<option value="' + esc(o.id) + '">' + esc(o.no + (o.customer ? " · " + o.customer : "")) + "</option>").join("") + '<option value="new">New order…</option></select>' +
     '<button class="btn" type="button" data-dorder="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '">Add to order</button></div></div>';
 }
-/* "Add a part" in an order: a window of its own with a search box and the parts to scroll through (like the catalogue);
-   a tap adds one to the order, the number on the right shows how many the order has */
+/* "Add a part" in an order, and on the To dismantler tab: a window of its own with a search box and the parts to scroll
+   through (like the catalogue); a tap adds one, the number on the right shows how many the order has or how many are wanted.
+   PK.oid: the order, or null for the dismantler list (parts for stock) */
 const PK = { oid: null, list: [], shown: 0, timer: 0 };
 function openPicker(oid) {
-  const o = orders.get(oid);
-  if (!o || !ordersReady()) return;
-  PK.oid = oid;
+  if (oid) { const o = orders.get(oid); if (!o || !ordersReady()) return; }
+  else if (!Backend.canWrite) { toast("You can only view this page."); return; }
+  PK.oid = oid || null;
   const sh = $("pickersheet");
   sh.innerHTML = '<header><div style="min-width:0"><div class="eyebrow" id="pk-head"></div><div class="bigdesc" style="font-size:20px;margin-top:2px">Add parts</div></div><button class="btn primary" type="button" data-pkdone>Done</button></header>' +
     '<div class="pksearch"><div class="searchbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>' +
@@ -2802,10 +2804,16 @@ function openPicker(oid) {
   $("pk-q").focus({ preventScroll: true });
 }
 function pkHead() {
+  if (!$("pk-head")) return;
+  const parts = (n) => n + (n === 1 ? " part" : " parts");
+  if (!PK.oid) {   // the dismantler list: what is still to request for stock
+    const n = [...prices.values()].filter((r) => r.listed && !r.sent).reduce((s, r) => s + (r.qty || 1), 0);
+    $("pk-head").textContent = "To dismantler · For stock · " + parts(n);
+    return;
+  }
   const o = orders.get(PK.oid);
-  if (!o || !$("pk-head")) return;
-  const n = orderUnits(o);
-  $("pk-head").textContent = orderLabel(o) + (o.customer ? " · " + o.customer : "") + " · " + n + (n === 1 ? " part" : " parts");
+  if (!o) return;
+  $("pk-head").textContent = orderLabel(o) + (o.customer ? " · " + o.customer : "") + " · " + parts(orderUnits(o));
 }
 // no search: the parts of the aircraft picked in the catalogue, complete units first (no hardware); otherwise the best matches
 function pkFind(text) {
@@ -2813,6 +2821,12 @@ function pkFind(text) {
   return suggestions(text, "", 400);
 }
 function pkCount(pn) {
+  if (!PK.oid) {   // dismantler list: how many are wanted; ✓ when it was requested already
+    const r = prices.get(pn);
+    if (r && r.listed && r.sent) return '<span class="pk-n sent" title="Requested ' + esc(dateNl(r.sent)) + '">✓</span>';
+    const n = r && r.listed ? r.qty || 1 : 0;
+    return '<span class="pk-n' + (n ? " on" : "") + '">' + (n ? "× " + n : "+") + "</span>";
+  }
   const o = orders.get(PK.oid);
   const n = o ? o.lines.filter((l) => l.pn === pn).reduce((s, l) => s + l.qty, 0) : 0;
   return '<span class="pk-n' + (n ? " on" : "") + '">' + (n ? "× " + n : "+") + "</span>";
@@ -2849,37 +2863,25 @@ function pkMore(force) {
   }
 }
 function pkAdd(b) {
-  const o = orders.get(PK.oid);
-  if (!o || !ordersReady()) return;
   const pn = b.dataset.pk;
-  addLine(o, pn, b.dataset.ac, 1);
+  if (PK.oid) {
+    const o = orders.get(PK.oid);
+    if (!o || !ordersReady()) return;
+    addLine(o, pn, b.dataset.ac, 1);
+    toast("Added " + pn);
+  } else if (!dismAdd(pn)) return;
   document.querySelectorAll('#pk-list [data-pk="' + CSS.escape(pn) + '"] .pk-n').forEach((el) => { el.outerHTML = pkCount(pn); });
   pkHead();
   renderOrders();
-  toast("Added " + pn);
 }
-// "Add a part" on the To dismantler tab: the part goes on the list for stock
-let dSugTimer = null;
-function dismSuggest() { clearTimeout(dSugTimer); dSugTimer = setTimeout(dismSuggestNow, 90); }
-function dismSuggestNow() {
-  clearTimeout(dSugTimer);
-  const t = $("dadd"), box = $("dadd-sugg");
-  const val = t.value.trim();
-  const sug = val.length >= 2 ? suggestions(val, "") : [];
-  box.innerHTML = sug.length ? '<div class="sugg">' + sug.map((e) => '<button type="button" data-dpick="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '"><span class="mono">' + esc(e.p) + "</span><span>" + esc(e.d) + ' <span class="tag ac">' + esc(acShort(e.ac)) + "</span>" + (inStock(e.p) ? ' <span class="tag instock">' + inStock(e.p) + " in stock</span>" : "") + "</span></button>").join("") + "</div>"
-    : val.length >= 3 ? '<div class="sugg"><span class="pnwarn" style="display:block;padding:8px 10px">Not in the IPC catalogue · Enter to add</span></div>' : "";
-  box.hidden = !box.innerHTML;
-}
+// a part for stock on the To dismantler list (one more when it is on it already)
 function dismAdd(pn) {
-  if (!Backend.canWrite) { toast("You can only view this page."); return; }
+  if (!Backend.canWrite) { toast("You can only view this page."); return false; }
   const r = rec(pn);
-  if (r.listed && r.sent) toast(pn + " was already requested on " + dateNl(r.sent));
-  else if (r.listed) { setRec(pn, { qty: (r.qty || 1) + 1 }); toast(pn + ": " + ((r.qty || 1) + 1) + " wanted"); }
+  if (r.listed && r.sent) { toast(pn + " was already requested on " + dateNl(r.sent)); return false; }
+  if (r.listed) { setRec(pn, { qty: (r.qty || 1) + 1 }); toast(pn + ": " + ((r.qty || 1) + 1) + " wanted"); }
   else { setRec(pn, { listed: true, qty: 1, sent: "" }); toast(pn + " added"); }
-  const t = $("dadd");
-  t.value = ""; $("dadd-sugg").innerHTML = ""; $("dadd-sugg").hidden = true;
-  renderOrders();
-  t.focus({ preventScroll: true });
+  return true;
 }
 function orderPick(oid, pn, ac) {
   const o = orders.get(oid);
@@ -2921,7 +2923,6 @@ function orderClick(t) {
     return true;
   }
   if ((b = q("[data-opick]"))) { orderPick(b.dataset.oid, b.dataset.opick, b.dataset.ac); return true; }
-  if ((b = q("[data-dpick]"))) { dismAdd(b.dataset.dpick); return true; }
   const o = (b = q("[data-oid]")) ? orders.get(b.dataset.oid) : null;
   if (o && q("[data-olqty]")) { const i = +b.dataset.li; patchLine(o, i, { qty: Math.max(1, o.lines[i].qty + +b.dataset.olqty) }); renderOrders(); return true; }
   if (o && q("[data-oldel]")) { const i = +b.dataset.oldel; const pn = o.lines[i].pn; putOrder({ ...o, lines: o.lines.filter((_, k) => k !== i) }); renderOrders(); toast("Removed " + pn + " from " + orderLabel(o)); return true; }
@@ -4302,6 +4303,7 @@ document.addEventListener("click", (ev) => {
   const t = ev.target;
   const opk = t.closest("[data-opicker]");
   if (opk) { openPicker(opk.dataset.opicker); return; }
+  if (t.closest("[data-dpicker]")) { openPicker(null); return; }
   const pkb = t.closest("#pk-list [data-pk]");
   if (pkb) { pkAdd(pkb); return; }
   if (t.closest("[data-pkdone]")) { closeSheets(); return; }
@@ -4418,7 +4420,6 @@ document.addEventListener("input", (ev) => {
   }
   if (t.id === "sf-status") $("sf-soldbox").hidden = t.value !== "sold";
   if (t.id === "pk-q") { clearTimeout(PK.timer); PK.timer = setTimeout(pkSearch, 120); }
-  if (t.id === "dadd") dismSuggest();
 });
 document.addEventListener("change", (ev) => {
   const t = ev.target;
@@ -4439,22 +4440,11 @@ document.addEventListener("change", (ev) => {
 document.addEventListener("keydown", (ev) => {
   const t = ev.target;
   if (ev.key === "Enter" && t.dataset && t.dataset.f) { ev.preventDefault(); t.blur(); }
-  if (t.id === "dadd" && ev.key === "Escape") { ev.stopPropagation(); t.value = ""; $("dadd-sugg").hidden = true; return; }
-  if (ev.key === "Enter" && t.id === "dadd") {
-    ev.preventDefault(); dismSuggestNow();
-    const first = document.querySelector("#dadd-sugg [data-dpick]");
-    if (first) dismAdd(first.dataset.dpick); else if (/^[A-Z0-9][A-Z0-9-]{2,39}$/i.test(t.value.trim())) dismAdd(t.value.trim().toUpperCase());
-    return;
-  }
   // Enter in the parts window adds the top part; the text stays selected, so the next part number can be typed over it
   if (ev.key === "Enter" && t.id === "pk-q") { ev.preventDefault(); clearTimeout(PK.timer); pkSearch(); const first = document.querySelector("#pk-list [data-pk]"); if (first) { pkAdd(first); t.select(); } return; }
   if (ev.key === "Enter" && ["on-customer", "on-ref", "on-contact", "on-email"].includes(t.id)) { ev.preventDefault(); document.querySelector("[data-ocreate]")?.click(); return; }
   if (ev.key === "Enter" && t.id === "sf-pn") { const first = document.querySelector("#sf-sugg [data-pick]"); if (first) { ev.preventDefault(); pickSuggestion(first.dataset.pick, first.dataset.ac); } }
 });
-// the suggestion list under "Add a part" closes when the cursor leaves the box; picking from it keeps the cursor there
-$("dadd-sugg").addEventListener("mousedown", (ev) => ev.preventDefault());
-$("dadd").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("dadd")) $("dadd-sugg").hidden = true; }, 0));
-$("dadd").addEventListener("focus", () => { if ($("dadd").value.trim()) dismSuggestNow(); });
 document.addEventListener("focusout", (ev) => {
   if (ev.target.classList && ev.target.classList.contains("price")) setTimeout(() => { const ae = document.activeElement; if (renderPending && !(ae && ae.classList.contains("price")) && !ae?.closest?.(".sheet")) { renderPending = false; render(); renderStock(); } }, 0);
 });
