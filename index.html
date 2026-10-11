@@ -282,6 +282,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .srow .c-money small { display: block; color: var(--muted); font-size: 11.5px; }
 .srow .c-txt { overflow-wrap: anywhere; font-size: 14px; }
 .srow .c-txt small { display: block; color: var(--muted); font-size: 12px; }
+@media (hover: hover) { .srow .c-part:hover .pn { color: var(--focus); } .srow .c-part:hover .desc { text-decoration: underline; text-underline-offset: 3px; } }
 .cond { display: inline-flex; align-items: center; font-family: var(--f-mono); font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 4px; border: 1px solid; white-space: nowrap; }
 .cond.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: var(--good-bg); }
 .cond.ar { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); background: var(--amber-bg); }
@@ -1665,7 +1666,8 @@ function srowHtml(it) {
   const sub = [it.from ? "from " + esc(it.from) : "", it.received ? "received " + esc(dateNl(it.received)) : "", it.condNote ? esc(it.condNote) : ""].filter(Boolean).join(" · ");
   const sold = it.status === "sold";
   return '<div class="srow" data-sid="' + esc(it.id) + '">' +
-    '<div class="c-txt">' + (it.ac ? '<span class="tag ac">' + esc(acShort(it.ac)) + "</span>" : "") + '<span class="pn">' + esc(it.pn) + '</span><div class="desc" style="font-size:14px">' + esc(it.desc || (e ? e.d : "")) + "</div>" + (sub ? '<small>' + sub + "</small>" : "") + "</div>" +
+    // the part number and description open the part information (as in the catalogue); the rest of the row edits the stock item
+    '<div class="c-txt' + (e ? ' c-part" title="Part information' : "") + '">' + (it.ac ? '<span class="tag ac">' + esc(acShort(it.ac)) + "</span>" : "") + '<span class="pn">' + esc(it.pn) + '</span><div class="desc" style="font-size:14px">' + esc(it.desc || (e ? e.d : "")) + "</div>" + (sub ? '<small>' + sub + "</small>" : "") + "</div>" +
     "<div>" + condBadge(it.cond) + (it.grade ? '<span class="grade">grade ' + esc(it.grade) + "</span>" : "") + "</div>" +
     '<div class="c-qty">' + esc(it.qty) + "</div>" +
     '<div class="c-txt mono" style="font-size:13px">' + (esc(it.serial) || '<span style="color:var(--muted)">–</span>') + "</div>" +
@@ -3854,6 +3856,8 @@ document.addEventListener("click", (ev) => {
     const it = stock.get(dd.dataset.ddiscard); removeStock(dd.dataset.ddiscard); renderStock(); render(); if (it) toast("Discarded " + it.pn);
     return;
   }
+  const sp = t.closest(".srow .c-part");
+  if (sp) { const it = stock.get(sp.parentNode.dataset.sid); const i = it ? entryIdx(it.pn, it.ac) : null; if (i != null) { openDetail(i); return; } }
   const su = t.closest("[data-sid]");
   if (su && !t.closest("input, select, textarea")) { const it = stock.get(su.dataset.sid); if (it) openStockForm(it, su.classList.contains("unitrow") ? S.sel : null); return; }
   if (t.closest("[data-close]")) { const back = SF && SF.returnTo; closeSheets(); if (back != null) openDetail(back); return; }
