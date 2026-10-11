@@ -324,6 +324,50 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .req::after { content: " *"; color: var(--bad); }
 .marginbox { padding: 8px 10px; border-radius: 6px; background: var(--surface-2); font-family: var(--f-mono); font-size: 15px; }
 .note-field { grid-column: 1 / -1; }
+/* Scan parts: camera on top, what was scanned below (side by side on a wide screen) */
+#scanview { position: fixed; inset: 0; z-index: 45; background: #15181d; color: #f2efe4; display: grid; grid-template-rows: auto minmax(180px, 1.2fr) minmax(0, 1fr); padding-top: env(safe-area-inset-top, 0px); }
+.scbar { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: #2a2e36; min-width: 0; }
+.scbar .t { font-family: var(--f-display); text-transform: uppercase; letter-spacing: .14em; font-size: 14px; white-space: nowrap; }
+.sccount { margin-right: auto; color: #e8b25a; font-size: 13px; white-space: nowrap; }
+.scbar button { border: 1px solid #4a505b; background: #3a3f49; color: #f2efe4; border-radius: 6px; padding: 7px 14px; font-size: 14px; cursor: pointer; }
+.scbar button.on { background: var(--amber-lamp); color: #2a1a00; border-color: var(--amber-lamp); }
+.scbar .scdone { background: #f2efe4; color: #1a2025; border-color: #f2efe4; font-weight: 600; }
+.scstage { position: relative; overflow: hidden; background: #000; min-height: 0; }
+.scstage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scframe { position: absolute; left: 10%; right: 10%; top: 19%; bottom: 19%; border: 2px solid rgba(255, 255, 255, .85); border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .32); pointer-events: none; transition: border-color .2s; }
+.scstage.hit .scframe { border-color: #4bd17c; animation: schit .5s ease-out; }
+.scstage.miss .scframe { border-color: #f0a623; }
+@keyframes schit { from { box-shadow: 0 0 0 9999px rgba(0, 0, 0, .32), inset 0 0 0 40px rgba(75, 209, 124, .35); } }
+.scnocam { display: none; margin: 0; }
+.scstage.nocam .scnocam { display: grid; position: absolute; inset: 0; place-items: center; padding: 24px; text-align: center; color: #c9ccd2; font-size: 15px; }
+.scstage.nocam .scframe { display: none; }
+.scmsg { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(0, 0, 0, .75); color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 14px; max-width: calc(100% - 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scmsg.ok { background: rgba(26, 120, 66, .94); }
+.scmsg.bad { background: rgba(150, 92, 12, .94); }
+.scpanel { min-height: 0; display: flex; flex-direction: column; background: var(--surface); color: var(--ink); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.scadd { display: flex; gap: 8px; padding: 12px 14px 6px; }
+.scadd input { flex: 1; min-width: 0; font-size: 16px; padding: 9px 12px; border: 1.5px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: var(--f-mono); text-transform: uppercase; }
+.scadd input:focus { border-color: var(--focus); outline: none; }
+.schint { margin: 0 14px 4px; font-size: 12.5px; color: var(--muted); }
+.sclist { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 14px 14px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.scrow { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.scpn { flex: 1; min-width: 0; }
+.scpn .ctx { display: block; }
+.scrow.ask .pn { color: var(--amber); }
+.scrow.ask { align-items: flex-start; }
+#scanstock svg { width: 20px; height: 20px; flex: none; }
+@media (max-width: 760px) { #view-stock .searchrow .bigbtn { padding: 0 14px; } }
+.scqty { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.scqty button { width: 32px; height: 32px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 6px; font-size: 17px; cursor: pointer; }
+.scqty span { min-width: 26px; text-align: center; font-weight: 600; }
+.scchoices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.scchoice { font-family: var(--f-mono); font-size: 13.5px; font-weight: 600; text-align: left; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 6px; padding: 5px 9px; cursor: pointer; max-width: 100%; }
+.scchoice small { display: block; font-family: var(--f-body); font-weight: 400; font-size: 11.5px; color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scempty { color: var(--muted); font-size: 14px; margin: 10px 0; }
+@media (min-width: 700px) and (orientation: landscape) {
+  #scanview { grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) 400px; }
+  .scbar { grid-column: 1 / -1; }
+}
 /* IPC drawing in the part details, and the full-screen viewer */
 .drawsec { min-width: 0; }
 .drawtabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
@@ -658,7 +702,8 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
         <input id="sq" class="bigsearch" type="search" autocomplete="off" spellcheck="false" placeholder="Search stock" aria-label="Search stock">
         <button id="clearsq" class="clearq" type="button" aria-label="Clear stock search" hidden>×</button>
       </div>
-      <button class="btn primary bigbtn" id="addstock" type="button">+ Add stock</button>
+      <button class="btn bigbtn" id="scanstock" type="button" aria-label="Scan" title="Scan parts to book in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 9v6M11 9v6M14 9v6M17 9v6"/></svg><span class="hidephone">Scan</span></button>
+      <button class="btn primary bigbtn" id="addstock" type="button">+ Add<span class="hidephone"> stock</span></button>
       </div>
     </div>
     <div class="filters">
@@ -3110,6 +3155,359 @@ function openSync() {
   if (Backend.onSyncOpen) Backend.onSyncOpen();
 }
 
+/* ---------- Scan parts into "To book in" ---------- */
+// The camera reads barcodes (Data Matrix, QR, Code 128, Code 39, PDF417) on part labels and data plates.
+// A part number that is found becomes a part to book in straight away; the same part scanned again counts one more,
+// unless its serial number was scanned already. Plates without a barcode: type the number, or use the
+// iPhone/iPad "Scan Text" in the field.
+const SC = { open: false, stream: null, track: null, torch: false, det: null, busy: false, timer: 0, seen: new Map(), rows: [], ask: [], audio: null, flashT: 0 };
+const PN_RX = "([A-Z0-9][A-Z0-9\\-\\/.]{1,39})";
+const PN_TAG = new RegExp("(?:^|[\\s*,;|])(?:PART\\s*(?:NUMBER|NUMB|NBR|NO|N°|#)\\.?|PNR|PNO|MPN|P\\/N|P\\.N\\.|PN|1P)\\s*[:#.*=-]?\\s*" + PN_RX);
+const SN_TAG = new RegExp("(?:^|[\\s*,;|])(?:SERIAL\\s*(?:NUMBER|NUMB|NBR|NO|N°|#)?\\.?|SER|S\\/N|S\\.N\\.|SN)\\s*[:#.*=-]?\\s*" + PN_RX.replace("{1,39}", "{0,39}"));
+function knownPn(s) {
+  s = String(s || "").replace(/[.,;:]+$/, "");
+  if (!s) return "";
+  if (byPn.has(s)) return s;
+  const o0 = s.replace(/O/g, "0");                          // text read from a plate: O and 0 look alike
+  if (byPn.has(o0)) return o0;
+  if (/^1?P./.test(s)) { const r = s.replace(/^1?P/, ""); if (byPn.has(r)) return r; }   // "P" / "1P" in front of the number (Code 39 labels)
+  return "";
+}
+// Handwriting and text read from a plate: letters and digits that look alike count as the same, and dashes, dots and
+// spaces don't count. A number that matches one catalogue part that way is taken; otherwise the closest ones are offered.
+const LOOKALIKE = { O: "0", Q: "0", D: "0", I: "1", L: "1", J: "1", "|": "1", S: "5", B: "8", Z: "2", G: "6" };
+const skel = (s) => String(s || "").toUpperCase().replace(/[OQDILJ|SBZG]/g, (c) => LOOKALIKE[c]).replace(/[^A-Z0-9]/g, "");
+let SKEL = null;
+function skelIndex() {
+  if (!SKEL) { SKEL = new Map(); for (const pn of byPn.keys()) { const k = skel(pn); if (!SKEL.has(k)) SKEL.set(k, []); SKEL.get(k).push(pn); } }
+  return SKEL;
+}
+function within1(a, b) {                                     // one character more, less or different at most
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, diff = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++diff > 1) return false;
+    if (a.length > b.length) i++; else if (a.length < b.length) j++; else { i++; j++; }
+  }
+  return diff + (a.length - i) + (b.length - j) <= 1;
+}
+function nearPns(word) {
+  const k = skel(word);
+  if (k.length < 4 || !/\d/.test(k)) return [];
+  const same = skelIndex().get(k);
+  if (same) return same.slice(0, 6);
+  const out = [];
+  for (const [key, pns] of skelIndex()) if (within1(key, k)) { out.push(...pns); if (out.length >= 6) break; }
+  return out.slice(0, 6);
+}
+// what a label says: { pn, sn, known, tagged, choices }
+function parseLabel(raw, fuzzy) {
+  const t = String(raw || "").replace(/[\x00-\x1f]/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+  if (!t) return {};
+  let pn = "", sn = "", tagged = false;
+  const iso = /^\[\)>/.test(t);                              // ISO 15434 (data identifiers 1P = part number, S = serial)
+  const m = PN_TAG.exec(t);
+  if (m) { pn = m[1].replace(/[.,;:]+$/, ""); tagged = true; }
+  const s = SN_TAG.exec(t) || (iso ? /(?:^|\s)S([A-Z0-9][A-Z0-9\-\/.]{0,39})/.exec(t) : null);
+  if (s) sn = s[1].replace(/[.,;:]+$/, "");
+  if (pn && sn === pn) sn = "";
+  let known = knownPn(pn);
+  if (!known) {
+    // no tag, or a tag around an unknown number: any word that is a catalogue part number
+    for (const w of t.split(/[\s*,;|]+/)) { const k = knownPn(w); if (k && k !== sn) { known = k; break; } }
+  }
+  if (known) return { pn: known, sn, known: true, tagged };
+  if (fuzzy) {
+    const tries = pn ? [pn] : t.split(/[\s*,;|]+/).filter((w) => /\d/.test(w) && w.length >= 4 && w !== sn);
+    for (const w of tries) {
+      const c = nearPns(w);
+      if (c.length === 1 && skel(c[0]) === skel(w)) return { pn: c[0], sn, known: true, tagged, read: w };
+      if (c.length) return { pn: w, sn, known: false, tagged: true, choices: c };
+    }
+  }
+  if (pn) return { pn, sn, known: false, tagged: true };
+  const words = t.split(/[\s*,;|]+/).filter(Boolean);
+  if (words.length === 1 && /\d/.test(words[0]) && words[0].length >= 4 && words[0].length <= 40) return { pn: words[0].replace(/^1P/, ""), sn: "", known: false, tagged: false };
+  return {};
+}
+
+function scanSound(ok) {
+  try {
+    const ctx = SC.audio;
+    if (ctx) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = ok ? 1175 : 330;
+      g.gain.value = 0.07;
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + (ok ? 0.08 : 0.16));
+    }
+  } catch (_) {}
+  try { if (navigator.vibrate) navigator.vibrate(ok ? 35 : [30, 50, 30]); } catch (_) {}
+}
+function scanMsg(text, kind) {
+  const el = $("sc-msg");
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "scmsg" + (kind ? " " + kind : "");
+  el.hidden = !text;
+  clearTimeout(SC.flashT);
+  if (text) SC.flashT = setTimeout(() => { el.hidden = true; }, 2600);
+  const st = $("sc-stage");
+  if (st && kind) { st.classList.remove("hit", "miss"); void st.offsetWidth; st.classList.add(kind === "ok" ? "hit" : "miss"); }
+}
+// a part number that was read: book it in (or count one more)
+function scanAdd(lab) {
+  if (!Backend.canWrite) { scanMsg("You can only view this page.", "bad"); return; }
+  const key = lab.pn + "|" + (lab.sn || "");
+  const row = SC.rows.find((r) => r.key === key && stock.has(r.id));
+  if (row && lab.sn) { scanMsg(lab.pn + " · S/N " + lab.sn + " is scanned already", "bad"); scanSound(false); return; }
+  if (row) {
+    const it = stock.get(row.id);
+    putStock({ ...it, qty: it.qty + 1 });
+    row.qty = it.qty + 1;
+  } else {
+    const e = entryOf(lab.pn, W.ac || S.ac);
+    const r = rec(lab.pn);
+    const it = putStock({ id: newId(), pn: lab.pn, desc: e ? e.d : "", ac: e ? e.ac : (W.ac || S.ac || ""), qty: 1, status: "draft", cond: "AR",
+      received: today(), serial: lab.sn || "", buy: r.buy ?? null, sell: r.sell ?? null });
+    SC.rows.unshift({ key, id: it.id, pn: lab.pn, sn: lab.sn || "", qty: 1, known: lab.known });
+  }
+  SC.ask = SC.ask.filter((a) => a.pn !== lab.pn);
+  scanMsg("Added " + lab.pn + (lab.sn ? " · S/N " + lab.sn : "") + (lab.read && lab.read !== lab.pn ? " (read " + lab.read + ")" : ""), "ok");
+  scanSound(true);
+  scanList();
+  renderStock();
+}
+function scanHandle(text, source) {
+  const now = Date.now();
+  if (source === "camera") {
+    const last = SC.seen.get(text);
+    SC.seen.set(text, now);
+    if (last && now - last < 2500) return;                    // still the same label in view
+  }
+  const lab = parseLabel(text, source === "typed");
+  if (lab.choices) {
+    // handwriting or a hard-to-read plate: close to these catalogue parts, so choose
+    SC.ask = SC.ask.filter((a) => a.pn !== lab.pn);
+    SC.ask.unshift(lab); scanList(); scanSound(false);
+    scanMsg("Check the part number", "bad");
+    return;
+  }
+  if (!lab.pn) { scanMsg(source === "camera" ? "Read “" + String(text).slice(0, 40) + "”: no part number in it" : "No part number found", "bad"); scanSound(false); return; }
+  if (!lab.known && !lab.tagged && source !== "typed") {
+    // an unknown code without "P/N": it could be anything (a serial, a work order), so ask first
+    if (!SC.ask.some((a) => a.pn === lab.pn)) { SC.ask.unshift(lab); scanList(); scanSound(false); }
+    scanMsg(lab.pn + " is not in the catalogue", "bad");
+    return;
+  }
+  scanAdd(lab);
+}
+function scanList() {
+  const el = $("sc-list");
+  if (!el) return;
+  SC.rows = SC.rows.filter((r) => stock.has(r.id));
+  const ask = SC.ask.map((a, i) => '<div class="scrow ask"><div class="scpn"><span class="pn">' + esc(a.pn) + '</span><span class="ctx">' + (a.choices ? "Which part?" : "Not in the catalogue") + (a.sn ? " · S/N " + esc(a.sn) : "") + "</span>" +
+    (a.choices ? '<div class="scchoices">' + a.choices.map((c, j) => { const e = entryOf(c, W.ac || S.ac); return '<button class="scchoice" type="button" data-scpick="' + i + ":" + j + '">' + esc(c) + (e ? "<small>" + esc(e.d) + "</small>" : "") + "</button>"; }).join("") + "</div>" : "") +
+    '</div><button class="btn small" type="button" data-scask="' + i + '">' + (a.choices ? "As read" : "Add") + '</button><button class="xbtn" type="button" data-scnot="' + i + '" aria-label="Ignore">×</button></div>').join("");
+  const rows = SC.rows.map((r) => {
+    const it = stock.get(r.id);
+    return '<div class="scrow"><div class="scpn"><span class="pn">' + esc(r.pn) + "</span>" +
+      '<span class="ctx">' + esc(it.desc || (r.known ? "" : "Not in the catalogue")) + (r.sn ? " · S/N " + esc(r.sn) : "") + "</span></div>" +
+      (r.sn ? "" : '<div class="scqty"><button type="button" data-scqty="' + esc(r.id) + ':-1" aria-label="One less">−</button><span class="mono">' + it.qty + '</span><button type="button" data-scqty="' + esc(r.id) + ':1" aria-label="One more">+</button></div>') +
+      '<button class="xbtn" type="button" data-scdel="' + esc(r.id) + '" aria-label="Remove ' + esc(r.pn) + '">×</button></div>';
+  }).join("");
+  const n = SC.rows.reduce((s, r) => s + (stock.get(r.id) || { qty: 0 }).qty, 0);
+  el.innerHTML = (ask || rows) ? ask + rows : '<p class="scempty">Point the camera at the barcode on the label.</p>';
+  const c = $("sc-count");
+  if (c) c.textContent = n ? n + " to book in" : "";
+}
+
+// the barcode reader: the phone's own when it has one (Android), otherwise ZXing (lib/zxing.js)
+let zxingP = null;
+function loadZxing() {
+  if (window.ZXing) return Promise.resolve(window.ZXing);
+  if (!zxingP) zxingP = new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "lib/zxing.js";
+    s.onload = () => (window.ZXing ? res(window.ZXing) : rej(new Error("no ZXing")));
+    s.onerror = () => { zxingP = null; s.remove(); rej(new Error("load failed")); };
+    document.head.appendChild(s);
+  });
+  return zxingP;
+}
+async function scanDecoder() {
+  if (SC.det) return SC.det;
+  if ("BarcodeDetector" in window) {
+    try {
+      const have = await window.BarcodeDetector.getSupportedFormats();
+      const want = ["data_matrix", "qr_code", "code_128", "code_39", "code_93", "pdf417", "itf", "ean_13", "upc_a"].filter((f) => have.includes(f));
+      if (want.includes("data_matrix") && want.includes("code_128")) {
+        const bd = new window.BarcodeDetector({ formats: want });
+        SC.det = async (canvas) => { const r = await bd.detect(canvas); return r.length ? r[0].rawValue : null; };
+        return SC.det;
+      }
+    } catch (_) {}
+  }
+  const Z = await loadZxing();
+  const hints = new Map();
+  hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.DATA_MATRIX, Z.BarcodeFormat.QR_CODE, Z.BarcodeFormat.CODE_128, Z.BarcodeFormat.CODE_39,
+    Z.BarcodeFormat.PDF_417, Z.BarcodeFormat.ITF, Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.UPC_A]);
+  hints.set(Z.DecodeHintType.TRY_HARDER, true);
+  const reader = new Z.MultiFormatReader();
+  reader.setHints(hints);
+  SC.det = async (canvas) => {
+    try { return reader.decodeWithState(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(canvas)))).getText(); }
+    catch (_) { return null; }
+    finally { try { reader.reset(); } catch (_) {} }
+  };
+  return SC.det;
+}
+// the middle of the picture, at most 1280 pixels wide. Three sizes in turn: the whole frame, and two tighter ones
+// (a barcode on a label on a dark panel reads better without the dark around it)
+const SC_CROPS = [[0.8, 0.62], [0.5, 0.36], [0.64, 0.48]];
+function scanGrab(src, w, h, frac) {
+  const cw = Math.round(w * frac[0]), ch = Math.round(h * frac[1]);
+  const sx = Math.round((w - cw) / 2), sy = Math.round((h - ch) / 2);
+  const k = Math.min(1, (frac[0] === 1 ? 2200 : 1280) / Math.max(cw, ch));
+  const cv = SC.canvas || (SC.canvas = document.createElement("canvas"));
+  cv.width = Math.max(1, Math.round(cw * k)); cv.height = Math.max(1, Math.round(ch * k));
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  g.drawImage(src, sx, sy, cw, ch, 0, 0, cv.width, cv.height);
+  return cv;
+}
+async function scanTick() {
+  if (!SC.open || !SC.stream) return;
+  const v = $("sc-video");
+  if (!SC.busy && v && v.readyState >= 2 && v.videoWidth && document.visibilityState === "visible") {
+    SC.busy = true;
+    try {
+      const det = await scanDecoder();
+      SC.crop = ((SC.crop || 0) + 1) % SC_CROPS.length;
+      const text = await det(scanGrab(v, v.videoWidth, v.videoHeight, SC_CROPS[SC.crop]));
+      if (text && SC.open) scanHandle(text, "camera");
+    } catch (_) {}
+    SC.busy = false;
+  }
+  if (SC.open) SC.timer = setTimeout(scanTick, 120);
+}
+async function scanCamera() {
+  const v = $("sc-video");
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $("sc-stage").classList.add("nocam"); $("sc-nocam").textContent = "No camera here. Type the part number below."; return; }
+  try {
+    SC.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+    if (!SC.open) { scanStopCamera(); return; }
+    v.srcObject = SC.stream;
+    await v.play().catch(() => {});
+    SC.track = SC.stream.getVideoTracks()[0];
+    const caps = SC.track && SC.track.getCapabilities ? SC.track.getCapabilities() : {};
+    $("sc-torch").hidden = !(caps && caps.torch);
+    $("sc-stage").classList.remove("nocam");
+    scanDecoder().catch(() => {});
+    clearTimeout(SC.timer);
+    scanTick();
+  } catch (err) {
+    $("sc-stage").classList.add("nocam");
+    $("sc-nocam").textContent = err && err.name === "NotAllowedError" ? "The camera is not allowed. Allow it in the settings, or type the part number below." : "The camera could not start. Type the part number below.";
+  }
+}
+function scanStopCamera() {
+  clearTimeout(SC.timer);
+  if (SC.stream) SC.stream.getTracks().forEach((t) => t.stop());
+  SC.stream = null; SC.track = null; SC.torch = false;
+  const v = $("sc-video");
+  if (v) v.srcObject = null;
+}
+function openScanner() {
+  if (Backend.local && !Backend.drafts) { toast("Close the program and open it again first."); return; }
+  if (!Backend.canWrite) { toast("You can only view this page; changes are not saved."); return; }
+  try { SC.audio = SC.audio || new (window.AudioContext || window.webkitAudioContext)(); SC.audio.resume(); } catch (_) { SC.audio = null; }
+  closeSheets();
+  let el = $("scanview");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "scanview";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-label", "Scan parts");
+    document.body.appendChild(el);
+  }
+  const apple = /iPad|iPhone|Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 0;
+  el.innerHTML = '<div class="scbar"><span class="t">Scan parts</span><span class="sccount" id="sc-count"></span>' +
+    '<button type="button" id="sc-torch" hidden>Light</button><button type="button" id="sc-done" class="scdone">Done</button></div>' +
+    '<div class="scstage" id="sc-stage"><video id="sc-video" playsinline muted autoplay></video><div class="scframe"></div><p class="scnocam" id="sc-nocam"></p><div class="scmsg" id="sc-msg" hidden></div></div>' +
+    '<div class="scpanel"><form class="scadd" id="sc-form" autocomplete="off"><input id="sc-input" type="text" inputmode="text" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Part number" aria-label="Part number">' +
+    '<button class="btn primary" type="submit">Add</button><label class="btn" for="sc-photo">Photo</label><input id="sc-photo" type="file" accept="image/*" capture="environment" hidden></form>' +
+    (apple ? '<p class="schint">No barcode, or written by hand? Tap the field, then Scan Text.</p>' : "") +
+    '<div class="sclist" id="sc-list"></div></div>';
+  el.hidden = false;
+  SC.open = true; SC.rows = []; SC.ask = []; SC.seen.clear();
+  scanList();
+  scanCamera();
+}
+function closeScanner() {
+  SC.open = false;
+  scanStopCamera();
+  const el = $("scanview");
+  if (el) el.hidden = true;
+  const n = SC.rows.filter((r) => stock.has(r.id)).length;
+  if (S.view !== "stock") setView("stock"); else renderStock();
+  if (n) toast(n + (n === 1 ? " part" : " parts") + " added to book in");
+}
+// a photo: more detail than the live picture, for small codes
+function scanPhoto(file) {
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = async () => {
+    scanMsg("Reading the photo…");
+    try {
+      const det = await scanDecoder();
+      let text = null;
+      for (const f of [[1, 1], ...SC_CROPS]) { text = await det(scanGrab(img, img.naturalWidth, img.naturalHeight, f)); if (text) break; }
+      if (text) scanHandle(text, "photo"); else { scanMsg("No barcode found in the photo", "bad"); scanSound(false); }
+    } catch (_) { scanMsg("The photo could not be read", "bad"); }
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); scanMsg("The photo could not be read", "bad"); };
+  img.src = url;
+}
+function scanClick(t) {
+  if (!SC.open) return false;
+  if (t.id === "sc-done") { closeScanner(); return true; }
+  if (t.id === "sc-torch") {
+    SC.torch = !SC.torch;
+    if (SC.track) SC.track.applyConstraints({ advanced: [{ torch: SC.torch }] }).catch(() => { SC.torch = false; });
+    t.classList.toggle("on", SC.torch);
+    return true;
+  }
+  const q = t.closest("[data-scqty]");
+  if (q) {
+    const [id, d] = q.dataset.scqty.split(":");
+    const it = stock.get(id);
+    if (it) { if (it.qty + +d < 1) removeStock(id); else putStock({ ...it, qty: it.qty + +d }); scanList(); renderStock(); }
+    return true;
+  }
+  const del = t.closest("[data-scdel]");
+  if (del) { const id = del.dataset.scdel; removeStock(id); SC.rows = SC.rows.filter((r) => r.id !== id); scanList(); renderStock(); return true; }
+  const ask = t.closest("[data-scask]");
+  if (ask) { const lab = SC.ask[+ask.dataset.scask]; if (lab) scanAdd({ pn: lab.pn, sn: lab.sn || "", known: false }); return true; }
+  const pick = t.closest("[data-scpick]");
+  if (pick) {
+    const [i, j] = pick.dataset.scpick.split(":").map(Number);
+    const a = SC.ask[i];
+    if (a && a.choices[j]) { SC.ask.splice(i, 1); scanAdd({ pn: a.choices[j], sn: a.sn || "", known: true, read: a.pn }); }
+    return true;
+  }
+  const not = t.closest("[data-scnot]");
+  if (not) { SC.ask.splice(+not.dataset.scnot, 1); scanList(); return true; }
+  return false;
+}
+document.addEventListener("visibilitychange", () => {
+  if (!SC.open) return;
+  if (document.visibilityState === "hidden") scanStopCamera(); else if (!SC.stream) scanCamera();
+});
+
 function showTextSheet(title, note, text) {
   ["detail", "stocksheet"].forEach((id) => { $(id).hidden = true; });
   const sh = $("msgsheet");
@@ -3302,6 +3700,7 @@ $("clearoq").addEventListener("click", () => { $("oq").value = ""; $("oq").dispa
 $("scrim").addEventListener("click", closeSheets);
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => setView(t.dataset.view)));
 document.addEventListener("keydown", (ev) => {
+  if (SC.open) { if (ev.key === "Escape") closeScanner(); return; }
   if (DV.open) {
     if (ev.key === "Escape") dvClose();
     else if (ev.key === "+" || ev.key === "=" || ev.key === "-") { const r = $("dvstage").getBoundingClientRect(); dvZoomAt(r.width / 2, r.height / 2, ev.key === "-" ? 1 / 1.5 : 1.5); }
@@ -3315,6 +3714,8 @@ document.addEventListener("keydown", (ev) => {
 
 document.addEventListener("click", (ev) => {
   const t = ev.target;
+  if (scanClick(t)) return;
+  if (t.closest("#scanstock")) { openScanner(); return; }
   const copy = t.closest("[data-copy]");
   if (copy) { ev.stopPropagation(); copyText(copy.dataset.copy); return; }
   const sg = t.closest("[data-pick]");
@@ -3370,6 +3771,7 @@ document.addEventListener("click", (ev) => {
 });
 document.addEventListener("submit", (ev) => {
   if (Backend.onSubmit && Backend.onSubmit(ev)) return;
+  if (ev.target.id === "sc-form") { ev.preventDefault(); const v = $("sc-input").value; if (v.trim()) { scanHandle(v, "typed"); $("sc-input").value = ""; } return; }
   if (ev.target.id === "sf") { ev.preventDefault(); saveStockForm(false); }
   if (ev.target.id === "coform") { ev.preventDefault(); saveCompany(); }
 });
@@ -3393,6 +3795,7 @@ document.addEventListener("change", (ev) => {
   if (t.id === "sf-status") { $("sf-soldbox").hidden = t.value !== "sold"; if (t.value === "sold" && !$("sf-solddate").value) $("sf-solddate").value = today(); return; }
   if (t.id && t.id.startsWith("sf-")) return;
   if (t.id === "co-logofile") { loadLogo(t.files && t.files[0]); return; }
+  if (t.id === "sc-photo") { scanPhoto(t.files && t.files[0]); t.value = ""; return; }
   if (t.id === "sync-file") { readSyncFile(t.files && t.files[0]); t.value = ""; return; }
   if (t.id && t.id.startsWith("co-")) return;
   if (t.dataset && t.dataset.f) commitPrice(t);
