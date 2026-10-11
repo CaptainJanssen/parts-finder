@@ -678,7 +678,10 @@ table.sales tfoot td { font-weight: 600; background: var(--surface-2); border-to
   .dl-pn { grid-area: pn; } .dl-desc { grid-area: desc; } .dl-ac { grid-area: ac; } .dl-st { grid-area: st; } .dl-qty { grid-area: qty; } .dl-x { grid-area: x; }
   .dgroup.sent .dline { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "chk pn pn pn" "chk desc desc desc" "chk ac st qty" "chk x x x"; }
   .dgroup.sent .dl-x { justify-content: flex-start; padding-top: 2px; }
-  #obar-orders, #obar-dism { position: static; padding-block: 12px 4px; }
+  #obar-orders { position: static; padding-block: 12px 4px; }
+  /* To dismantler: "Add a part", Export, Copy and Mark requested stay at the top while you scroll (as on the iPad) */
+  #obar-dism { position: sticky; top: 0; z-index: 5; padding-block: 12px 8px; }
+  @media (max-width: 360px) { #obar-dism .searchrow { gap: 6px; } #obar-dism .dact { padding: 0 9px; font-size: 14px; } }   /* small phones: the three buttons on one line */
   #obar-dism .addbox { flex-basis: 100%; }
   #obar-dism .dact { flex: 1 1 auto; justify-content: center; }
   .headright .tabs { width: 100%; min-width: 0; flex: 1 1 auto; }
