@@ -221,7 +221,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
   main.wrap { flex: 1 1 auto; min-height: 0; width: 100%; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom, 0px); }
 }
 
-.rhead, .row { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(0, 3fr) 96px 96px 104px 84px; gap: 12px; align-items: center; padding: 10px 14px; }
+.rhead, .row { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(0, 3fr) 96px 96px 104px 152px; gap: 12px; align-items: center; padding: 10px 14px; }
+@media (min-width: 761px) and (max-width: 1100px) {
+  .rhead, .row { grid-template-columns: minmax(130px, 1.1fr) minmax(0, 3fr) 90px 90px 96px 92px; }
+  .row .c-act { flex-direction: column; align-items: flex-end; }
+}
 .rhead, .shead { font-family: var(--f-display); text-transform: uppercase; letter-spacing: .12em; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .rhead .r, .shead .r { text-align: right; }
 .row, .srow { border-bottom: 1px solid var(--line); cursor: pointer; }
@@ -256,6 +260,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .addlist { border: 1px solid var(--line); background: transparent; border-radius: 5px; padding: 4px 8px; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
 .addlist:hover { border-color: var(--muted); }
 .addlist.on { background: var(--amber-bg); border-color: var(--amber); color: var(--amber); font-weight: 700; }
+.addlist.open { border-color: var(--focus); }
+/* catalogue: how many, then "+ Add" (side by side; stacked on a tablet where the row is narrow) */
+.c-act { display: flex; gap: 6px; align-items: center; justify-content: flex-end; }
+.rq button { width: 28px; height: 28px; font-size: 15px; color: var(--ink); }
+.rq output { min-width: 26px; font-size: 13.5px; }
+/* the "+ Add" menu: warehouse, orders, dismantler list */
+.amenu { position: fixed; z-index: 30; min-width: 240px; max-width: min(330px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 6px; }
+.amenu button { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; width: 100%; text-align: left; border: 0; background: transparent; color: var(--ink); padding: 10px; border-radius: 6px; cursor: pointer; font-size: 14.5px; }
+.amenu button:hover, .amenu button:focus-visible { background: var(--surface-2); }
+.amenu small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.amenu .amc { min-width: 0; overflow-wrap: anywhere; }
+.amh { padding: 6px 10px 8px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.amg { padding: 10px 10px 2px; font-family: var(--f-display); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); margin-top: 4px; }
+.amsep { border-top: 1px solid var(--line); margin: 4px 0; }
 .more { display: flex; justify-content: center; gap: 12px; align-items: center; padding: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; flex-wrap: wrap; }
 .empty { padding: 36px 20px; text-align: center; color: var(--muted); }
 .empty h3 { color: var(--ink); font-family: var(--f-display); font-weight: 500; letter-spacing: .04em; margin: 0 0 6px; }
@@ -1576,7 +1594,22 @@ function rowHtml(e) {
     '<div class="c-buy"><input class="price" inputmode="decimal" data-f="buy" data-pn="' + esc(e.p) + '" value="' + esc(money(r.buy)) + '" placeholder="0,00" aria-label="Buy price for ' + esc(e.p) + '"' + ro + "></div>" +
     '<div class="c-sell"><input class="price" inputmode="decimal" data-f="sell" data-pn="' + esc(e.p) + '" value="' + esc(money(r.sell)) + '" placeholder="0,00" aria-label="Sell price for ' + esc(e.p) + '"' + ro + "></div>" +
     '<div class="c-margin">' + mgHtml + "</div>" +
-    '<div class="c-act"><button class="addlist' + (r.listed ? " on" : "") + '" type="button" data-list="' + esc(e.p) + '"' + (Backend.canWrite ? "" : " disabled") + ">" + (r.listed ? "✓ Listed" : "+ List") + "</button></div></div>";
+    '<div class="c-act">' + rqHtml(e.p) + '<button class="addlist' + (r.listed ? " on" : "") + '" type="button" data-addmenu="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '" aria-haspopup="menu"' + (Backend.canWrite ? "" : " disabled") + ">" + (r.listed ? "✓ Listed" : "+ Add") + "</button></div></div>";
+}
+// how many to add with "+ Add" (per part, back to 1 once added)
+const CQ = new Map();
+function rqHtml(pn) {
+  const q = CQ.get(pn) || 1, dis = Backend.canWrite ? "" : " disabled";
+  return '<span class="qty rq"><button type="button" data-rq="-1" data-rqp="' + esc(pn) + '" aria-label="Fewer"' + (dis || (q <= 1 ? " disabled" : "")) + ">−</button><output>" + q + '</output><button type="button" data-rq="1" data-rqp="' + esc(pn) + '" aria-label="More"' + dis + ">+</button></span>";
+}
+function rqSet(pn, q) {
+  if (q <= 1) CQ.delete(pn); else CQ.set(pn, q);
+  document.querySelectorAll(".rq").forEach((box) => {
+    const minus = box.querySelector('[data-rq="-1"]');
+    if (minus.dataset.rqp !== pn) return;
+    box.querySelector("output").value = String(Math.max(1, q));
+    if (Backend.canWrite) minus.disabled = q <= 1;
+  });
 }
 let lastSig = "";
 function render() {
@@ -2362,7 +2395,8 @@ function ordersHtml(ro) {
   const shown = all.filter((o) => (L.filter === "all" || q || isOpenOrder(o) || o.id === L.open) && orderMatches(o, q));
   let h = "";
   if (L.creating) {
-    h += '<div class="results onew"><h3 class="onewh">New order <span class="mono muted">' + esc(L.newNo) + "</span></h3><div class=\"ofields\">" +
+    h += '<div class="results onew"><h3 class="onewh">New order <span class="mono muted">' + esc(L.newNo) + "</span></h3>" +
+      (L.addAfter ? '<p class="note" style="margin:0 0 10px">With ' + (L.addAfter.q > 1 ? L.addAfter.q + " × " : "") + '<span class="mono">' + esc(L.addAfter.pn) + "</span></p>" : "") + '<div class="ofields">' +
       '<label class="field" for="on-customer"><span class="req">Customer</span><input id="on-customer" autocomplete="off"></label>' +
       '<label class="field" for="on-ref">Their reference<input id="on-ref" autocomplete="off"></label>' +
       '<label class="field" for="on-contact">Contact<input id="on-contact" autocomplete="off"></label>' +
@@ -2617,12 +2651,13 @@ function orderClick(t) {
     L.creating = true; L.tab = "orders"; renderOrders(); $("oscroll").scrollTop = 0; MAIN.scrollTop = 0;
     $("on-customer")?.focus(); return true;
   }
-  if (q("[data-ocancel]")) { L.creating = false; renderOrders(); return true; }
+  if (q("[data-ocancel]")) { L.creating = false; L.addAfter = null; renderOrders(); return true; }
   if (q("[data-ocreate]")) {
     if (!ordersReady()) return true;
     const customer = ($("on-customer")?.value || "").trim();
     if (!customer) { toast("Enter the customer name."); $("on-customer")?.focus(); return true; }
-    const o = newOrder({ no: L.newNo, customer, ref: ($("on-ref")?.value || "").trim(), contact: ($("on-contact")?.value || "").trim(), email: ($("on-email")?.value || "").trim() });
+    let o = newOrder({ no: L.newNo, customer, ref: ($("on-ref")?.value || "").trim(), contact: ($("on-contact")?.value || "").trim(), email: ($("on-email")?.value || "").trim() });
+    if (L.addAfter) { o = addLine(o, L.addAfter.pn, L.addAfter.ac, L.addAfter.q || 1); L.addAfter = null; }   // the part picked with "+ Add" in the catalogue
     L.creating = false; L.open = o.id; L.q = ""; $("oq").value = ""; $("clearoq").hidden = true;
     renderOrders(); scrollToOpenOrder();
     $("oadd-input")?.focus({ preventScroll: true });
@@ -3780,7 +3815,80 @@ function toggleList(pn) {
   render();
 }
 function setQty(pn, q) { q = Math.max(1, Math.min(999, Math.round(q) || 1)); setRec(pn, { qty: q, listed: true }); }
+/* "+ Add" on a catalogue part: choose where it goes - the warehouse, a customer order or the dismantler list */
+const AM = { el: null, btn: null, pn: "", ac: "" };
+function closeAddMenu() {
+  if (!AM.el) return;
+  AM.el.remove(); AM.el = null;
+  if (AM.btn) { AM.btn.classList.remove("open"); AM.btn.setAttribute("aria-expanded", "false"); AM.btn = null; }
+}
+function openAddMenu(btn) {
+  closeAddMenu();
+  const pn = btn.dataset.addmenu, ac = btn.dataset.ac || "";
+  const r = rec(pn), have = inStock(pn), q = CQ.get(pn) || 1;
+  const open = [...orders.values()].filter(isOpenOrder).sort(byNewest).slice(0, 5);
+  const el = document.createElement("div");
+  el.className = "amenu"; el.id = "addmenu"; el.setAttribute("role", "menu");
+  el.innerHTML = '<div class="amh">Add ' + (q > 1 ? q + " × " : "") + '<span class="mono">' + esc(pn) + "</span> to</div>" +
+    '<button type="button" role="menuitem" data-am="stock">Warehouse<small>' + (have ? have + " in stock · " : "") + "to book in</small></button>" +
+    '<div class="amg">Orders</div>' +
+    open.map((o) => '<button type="button" role="menuitem" data-am="order" data-amo="' + esc(o.id) + '"><span class="amc">' + esc(o.customer || "No customer") + '</span><small class="mono">' + esc(o.no) + "</small></button>").join("") +
+    '<button type="button" role="menuitem" data-am="neworder">+ New order</button>' +
+    '<div class="amsep"></div>' +
+    '<button type="button" role="menuitem" data-am="dism">Dismantler list' + (r.listed ? "<small>✓ listed · tap to take off</small>" : "") + "</button>";
+  document.body.appendChild(el);
+  Object.assign(AM, { el, btn, pn, ac, q });
+  btn.classList.add("open"); btn.setAttribute("aria-expanded", "true");
+  // under the button, kept on the screen (above it when there is no room below)
+  const b = btn.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const x = Math.min(window.innerWidth - w - 8, Math.max(8, b.right - w));
+  let y = b.bottom + 6;
+  if (y + h > vh - 8) y = Math.max(8, b.top - h - 6);
+  el.style.left = x + "px"; el.style.top = y + "px";
+}
+function addMenuPick(b) {
+  const { pn, ac, q } = AM, kind = b.dataset.am;
+  const what = (q > 1 ? q + " × " : "") + pn;
+  closeAddMenu();
+  if (!Backend.canWrite) { toast("You can only view this page."); return; }
+  if (kind === "stock") {
+    // into "To book in" on the Warehouse page; a part already waiting there (not for an order) just gets more
+    const e = entryOf(pn, ac), r = rec(pn);
+    const wait = [...stock.values()].find((s) => s.status === "draft" && s.pn === pn && !s.order);
+    if (wait) putStock({ ...wait, qty: wait.qty + q });
+    else putStock({ id: newId(), pn, desc: e ? e.d : "", ac: e ? e.ac : ac, qty: q, status: "draft", cond: "AR", received: today(), buy: r.buy ?? null, sell: r.sell ?? null });
+    rqSet(pn, 1);
+    renderStock(); render();
+    toast(what + " added to To book in");
+  } else if (kind === "dism") {
+    const r = rec(pn);
+    if (r.listed) toggleList(pn);
+    else { setRec(pn, { listed: true, qty: q, sent: "" }); rqSet(pn, 1); toast(what + " added to the dismantler list"); render(); }
+  } else if (kind === "order") {
+    const o = orders.get(b.dataset.amo);
+    if (o && ordersReady()) { addLine(o, pn, ac, q); rqSet(pn, 1); toast("Added " + what + " to " + orderLabel(o) + (o.customer ? " · " + o.customer : "")); }
+  } else if (kind === "neworder") {
+    if (!ordersReady()) return;
+    if (!L.creating) L.newNo = newOrderNo();
+    L.creating = true; L.tab = "orders"; L.addAfter = { pn, ac, q };
+    rqSet(pn, 1);
+    setView("orders");
+    $("oscroll").scrollTop = 0; MAIN.scrollTop = 0;
+    $("on-customer")?.focus();
+  }
+}
+// while the menu is open, a tap picks an item or just closes the menu - it never reaches what lies underneath
+document.addEventListener("click", (ev) => {
+  if (!AM.el) return;
+  ev.stopPropagation(); ev.preventDefault();
+  const mb = ev.target.closest("#addmenu button");
+  if (mb) addMenuPick(mb); else if (!ev.target.closest("#addmenu")) closeAddMenu();
+}, true);
+document.addEventListener("scroll", closeAddMenu, true);
+window.addEventListener("resize", closeAddMenu);
 function setView(v) {
+  closeAddMenu();
   if (v === "parts" && S.ac == null) v = "pick";      // the catalogue needs an aircraft first
   if (S.view !== v) MAIN.scrollTop = 0;               // phones: each view starts at its top
   S.view = v;
@@ -3892,6 +4000,7 @@ $("scrim").addEventListener("click", closeSheets);
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => setView(t.dataset.view)));
 document.addEventListener("keydown", (ev) => {
   if (SC.open) { if (ev.key === "Escape") closeScanner(); return; }
+  if (AM.el && ev.key === "Escape") { closeAddMenu(); return; }
   if (DV.open) {
     if (ev.key === "Escape") dvClose();
     else if (ev.key === "+" || ev.key === "=" || ev.key === "-") { const r = $("dvstage").getBoundingClientRect(); dvZoomAt(r.width / 2, r.height / 2, ev.key === "-" ? 1 / 1.5 : 1.5); }
@@ -3905,6 +4014,10 @@ document.addEventListener("keydown", (ev) => {
 
 document.addEventListener("click", (ev) => {
   const t = ev.target;
+  const amb = t.closest("[data-addmenu]");
+  if (amb) { openAddMenu(amb); return; }
+  const rqb = t.closest("[data-rq]");
+  if (rqb) { if (Backend.canWrite) rqSet(rqb.dataset.rqp, Math.max(1, Math.min(99, (CQ.get(rqb.dataset.rqp) || 1) + +rqb.dataset.rq))); return; }
   if (scanClick(t)) return;
   if (t.closest("#scanstock")) { openScanner(); return; }
   const copy = t.closest("[data-copy]");
@@ -3980,7 +4093,7 @@ document.addEventListener("click", (ev) => {
   const dq = t.closest("[data-qty]");
   if (dq && S.sel != null) { const pn = P[S.sel].p; setQty(pn, (rec(pn).qty || 1) + +dq.dataset.qty); $("d-qty").value = rec(pn).qty; return; }
   const row = t.closest(".row");
-  if (row && !t.closest("input, button")) openDetail(+row.dataset.i);
+  if (row && !t.closest("input, button, .qty")) openDetail(+row.dataset.i);
 });
 document.addEventListener("submit", (ev) => {
   if (Backend.onSubmit && Backend.onSubmit(ev)) return;
