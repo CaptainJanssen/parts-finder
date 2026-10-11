@@ -3982,6 +3982,26 @@ if (navigator.maxTouchPoints > 0) {
   if (window.visualViewport) window.visualViewport.addEventListener("resize", () => { setTimeout(settle, 80); setTimeout(settle, 400); });
   window.addEventListener("scroll", () => { if (!typing()) requestAnimationFrame(settle); }, { passive: true });
   window.addEventListener("orientationchange", () => setTimeout(settle, 300));
+  // A button in a form or the scanner reacts on the touch itself. Otherwise the keyboard or a picker closing at that
+  // moment moves the form, and the tap is lost (Save had to be pressed twice, or only worked after a moment).
+  let tap = null;
+  document.addEventListener("touchstart", (ev) => {
+    const b = ev.touches.length === 1 ? ev.target.closest(".sheet button, #scanview button") : null;
+    tap = b && !b.disabled ? { b, x: ev.touches[0].clientX, y: ev.touches[0].clientY, t: Date.now() } : null;
+  }, { passive: true });
+  document.addEventListener("touchmove", (ev) => {
+    if (tap && Math.hypot(ev.touches[0].clientX - tap.x, ev.touches[0].clientY - tap.y) > 10) tap = null;   // scrolling, not a tap
+  }, { passive: true });
+  document.addEventListener("touchcancel", () => { tap = null; }, { passive: true });
+  document.addEventListener("touchend", (ev) => {
+    const f = tap;
+    tap = null;
+    if (!f || ev.touches.length || Date.now() - f.t > 800 || f.b.disabled || !f.b.isConnected) return;
+    ev.preventDefault();                                     // no second, late click
+    const a = document.activeElement;
+    if (a && a !== f.b && typing()) a.blur();                // the keyboard closes
+    f.b.click();
+  }, { passive: false });
 }
 Backend.init(H).then(() => {
   if ($("syncbtn")) $("syncbtn").hidden = !!(Backend.local && Backend.remote);
