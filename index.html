@@ -439,9 +439,9 @@ table.occ tr:last-child td { border-bottom: 0; }
 .qty.big { display: flex; height: 40px; background: var(--surface-2); }
 .qty.big button { width: 54px; height: auto; font-size: 21px; color: var(--ink); }
 .qty.big output { flex: 1; align-self: center; font-size: 16px; }
-.xmain { font-size: 13.5px; font-weight: 600; color: var(--ink); margin-bottom: -4px; }
 .xent { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; margin-top: 12px; }
-.xhead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13.5px; font-weight: 600; }
+#sf-main0.xent { margin-top: 0; }
+.xhead { display: flex; align-items: center; gap: 8px; min-height: 34px; margin-bottom: 10px; font-size: 13.5px; font-weight: 600; }
 .xhead .qty button { width: 36px; height: 34px; font-size: 17px; color: var(--ink); }
 .xhead .sp { flex: 1; }
 #sf-addx { margin-top: 12px; }
@@ -1798,13 +1798,12 @@ function renderStockForm() {
     '<label class="field" for="sf-grade">Cosmetic grade<select id="sf-grade"' + ro + '><option value="">Not graded</option>' + opt(GRADES, it.grade) + "</select></label>" +
     '<label class="field full" for="sf-condnote">Condition notes<input id="sf-condnote" value="' + esc(it.condNote) + '"' + ro + "></label>" +
     "</div></div>" +
-    '<div class="sec"><h4>Location and origin</h4><div class="formgrid">' +
-    '<div class="full xmain" id="sf-mainn" hidden></div>' +
+    '<div class="sec"><h4>Location and origin</h4><div id="sf-main0"><div class="xhead" id="sf-mainn" hidden></div><div class="formgrid">' +
     '<label class="field" for="sf-serial">Serial number<input id="sf-serial" class="m" value="' + esc(it.serial) + '"' + ro + "></label>" +
     '<label class="field" for="sf-loc">Location<input id="sf-loc" list="sf-locs" value="' + esc(it.loc) + '"' + ro + '><datalist id="sf-locs">' + locs.map((l) => '<option value="' + esc(l) + '">').join("") + "</datalist></label>" +
     '<label class="field" for="sf-from">Removed from aircraft<input id="sf-from" list="sf-froms" value="' + esc(it.from) + '" placeholder="Registration or MSN"' + ro + '><datalist id="sf-froms">' + froms.map((l) => '<option value="' + esc(l) + '">').join("") + "</datalist></label>" +
     '<label class="field" for="sf-received">Date received<input id="sf-received" type="date" value="' + esc(it.received) + '"' + ro + "></label>" +
-    '</div><div id="sf-extra"></div>' + (Backend.canWrite ? '<button class="btn" type="button" id="sf-addx" hidden>+ Add entry</button>' : "") + "</div>" +
+    '</div></div><div id="sf-extra"></div>' + (Backend.canWrite ? '<button class="btn" type="button" id="sf-addx" hidden>+ Add entry</button>' : "") + "</div>" +
     '<div class="sec"><h4>Price per unit</h4><div class="formgrid">' +
     '<label class="field" for="sf-buy">Bought for (€)<input id="sf-buy" class="m" inputmode="decimal" value="' + esc(money(it.buy)) + '" placeholder="0,00"' + ro + "></label>" +
     '<label class="field" for="sf-sell">Asking price (€)<input id="sf-sell" class="m" inputmode="decimal" value="' + esc(money(it.sell)) + '" placeholder="0,00"' + ro + "></label>" +
@@ -1833,6 +1832,8 @@ function sfDraw() {
   $("sf-qty").value = String(SF.qty);
   const dn = $("stocksheet").querySelector('[data-sfq="-1"]');
   if (dn && !ro) dn.disabled = main <= 1 && !SF.extra.some((x) => x.n > 1);
+  // with extra entries the first set of boxes gets the same frame, showing the units it keeps
+  $("sf-main0").classList.toggle("xent", SF.extra.length > 0);
   $("sf-mainn").hidden = !SF.extra.length;
   $("sf-mainn").textContent = units(main);
   if ($("sf-addx")) $("sf-addx").hidden = main < 2;
@@ -1841,6 +1842,7 @@ function sfDraw() {
     '<label class="field">Serial number<input class="m" data-x="' + i + '" data-xf="serial" value="' + esc(x.serial) + '"' + ro + "></label>" +
     '<label class="field">Location<input list="sf-locs" data-x="' + i + '" data-xf="loc" value="' + esc(x.loc) + '"' + ro + "></label>" +
     '<label class="field">Removed from aircraft<input list="sf-froms" data-x="' + i + '" data-xf="from" value="' + esc(x.from) + '" placeholder="Registration or MSN"' + ro + "></label>" +
+    '<label class="field">Date received<input type="date" data-x="' + i + '" data-xf="received" value="' + esc(x.received) + '"' + ro + "></label>" +
     "</div></div>").join("");
 }
 function sfStep(kind, i, d) {
@@ -1855,7 +1857,7 @@ function sfStep(kind, i, d) {
     const x = SF.extra[i];
     if (x && d > 0 && main > 1) x.n++;
     else if (x && d < 0 && x.n > 1) x.n--;
-  } else if (kind === "add") { if (main > 1) SF.extra.push({ n: 1, serial: "", loc: "", from: "" }); }
+  } else if (kind === "add") { if (main > 1) SF.extra.push({ n: 1, serial: "", loc: "", from: "", received: $("sf-received").value }); }
   else if (kind === "del") SF.extra.splice(i, 1);
   sfDraw();
 }
@@ -1885,16 +1887,16 @@ function saveStockForm(addAnother) {
   if (byPn.has(it.pn)) { const e = entryOf(it.pn, it.ac); if (!it.desc) it.desc = e.d; if (!it.ac) it.ac = e.ac; }
   // extra entries become their own stock items; entries with the same serial, location and aircraft are joined
   sfKeep();
-  const where = (x) => [x.serial, x.loc, x.from].join("\u0001");
+  const where = (x) => [x.serial, x.loc, x.from, x.received].join("\u0001");
   const extra = [];
   for (const x of SF.extra) {
-    const e = { n: x.n, serial: x.serial.trim(), loc: x.loc.trim(), from: x.from.trim().toUpperCase() };
+    const e = { n: x.n, serial: x.serial.trim(), loc: x.loc.trim(), from: x.from.trim().toUpperCase(), received: x.received || it.received };
     if (where(e) === where(it)) { it.qty += e.n; continue; }
     const same = extra.find((y) => where(y) === where(e));
     if (same) same.n += e.n; else extra.push(e);
   }
   putStock(it);
-  for (const e of extra) putStock({ ...it, id: newId(), qty: e.n, serial: e.serial, loc: e.loc, from: e.from, created: "" });
+  for (const e of extra) putStock({ ...it, id: newId(), qty: e.n, serial: e.serial, loc: e.loc, from: e.from, received: e.received, created: "" });
   toast(SF.isNew || SF.isDraft ? "Added " + it.pn + " to the warehouse" : "Saved " + it.pn);
   if (addAnother) {
     const next = { ...it, id: newId(), serial: "", notes: "", condNote: "", qty: 1, status: "stock", soldPrice: null, soldDate: "", customer: "", created: "", updated: "" };
