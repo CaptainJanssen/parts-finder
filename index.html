@@ -266,9 +266,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .rq button { width: 28px; height: 28px; font-size: 15px; color: var(--ink); }
 .rq output { min-width: 26px; font-size: 13.5px; }
 /* the "+ Add" menu: warehouse, orders, dismantler list */
-.amenu { position: fixed; z-index: 30; min-width: 240px; max-width: min(330px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 6px; }
-.amenu button { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; width: 100%; text-align: left; border: 0; background: transparent; color: var(--ink); padding: 10px; border-radius: 6px; cursor: pointer; font-size: 14.5px; }
-.amenu button:hover, .amenu button:focus-visible { background: var(--surface-2); }
+.amenu { position: fixed; z-index: 41; min-width: 240px; max-width: min(330px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 6px; }
+.amenu > button { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; width: 100%; text-align: left; border: 0; background: transparent; color: var(--ink); padding: 10px; border-radius: 6px; cursor: pointer; font-size: 14.5px; }
+.amenu > button:hover, .amenu > button:focus-visible { background: var(--surface-2); }
 .amenu small { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .amenu .amc { min-width: 0; overflow-wrap: anywhere; }
 .amh { padding: 6px 10px 8px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); margin-bottom: 4px; }
@@ -593,6 +593,33 @@ table.occ tr:last-child td { border-bottom: 0; }
 .dr-act { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 .dr-act .xbtn { width: auto; min-width: 30px; height: 30px; font-size: 15px; padding: 0 8px; }
 .dr-act .xbtn.arm { color: var(--bad); border-color: var(--bad); font-size: 13px; }
+/* status right in the list: a small dropdown that looks like the status label */
+.stsel { font-size: 12.5px; padding: 3px 22px 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23889' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 8px center; -webkit-appearance: none; appearance: none; cursor: pointer; max-width: 100%; }
+.stsel.stock { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+.stsel.reserved { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); background-color: var(--amber-bg); }
+.stsel.sold { color: var(--muted); }
+.stsel:disabled { cursor: default; opacity: .8; }
+/* Sold: folds open; parts stay until you take them off */
+.soldsec { margin-bottom: 16px; }
+.soldtoggle { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: var(--surface-2); color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.soldtoggle[aria-expanded="false"] { border-bottom: 0; }
+.soldtoggle .chev { color: var(--muted); font-size: 13px; }
+.solrow { display: grid; grid-template-columns: minmax(0, 3fr) 50px 104px 104px auto; gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.solrow:last-child { border-bottom: 0; }
+.solrow:hover { background: var(--surface-2); }
+.so-part .pn { margin-right: 6px; }
+.so-qty { text-align: right; font-weight: 600; }
+.so-m { text-align: right; font-family: var(--f-mono); font-size: 13.5px; }
+.so-m small { display: block; font-family: var(--f-body); font-size: 11.5px; color: var(--muted); }
+.so-act { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.so-act .xbtn { width: auto; min-width: 30px; height: 30px; font-size: 15px; padding: 0 8px; }
+.so-act .xbtn.arm { color: var(--bad); border-color: var(--bad); font-size: 13px; }
+/* catalogue: under Buy and Sell, what the last one sold went for */
+.hist { display: block; text-align: right; font-size: 11.5px; color: var(--muted); margin-top: 3px; font-family: var(--f-mono); white-space: nowrap; }
+table.sales td.r, table.sales th.r { text-align: right; }
+table.sales tfoot td { font-weight: 600; background: var(--surface-2); border-top: 1px solid var(--line); }
+.countpop .cprow { display: flex; gap: 8px; align-items: center; padding: 4px 4px 2px; }
+.countpop .qty.big { flex: 1; }
 .tab .lamp.on { margin-left: 2px; }
 /* tablets (an iPad upright): the order lines keep their columns, the stock and request status goes under the description */
 @media (min-width: 761px) and (max-width: 1100px) {
@@ -629,6 +656,10 @@ table.occ tr:last-child td { border-bottom: 0; }
   .dselbar { padding: 2px 12px 10px; }
   .drow { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "pn qty" "desc desc" "act act"; gap: 6px 10px; padding: 10px 12px; }
   .dr-pn { grid-area: pn; } .dr-desc { grid-area: desc; } .dr-qty { grid-area: qty; } .dr-act { grid-area: act; justify-content: flex-start; }
+  .solrow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; grid-template-areas: "part part qty" "buy sold sold" "act act act"; gap: 6px 10px; padding: 10px 12px; }
+  .so-part { grid-area: part; } .so-qty { grid-area: qty; align-self: start; } .so-m:nth-of-type(3) { grid-area: buy; text-align: left; } .so-m:nth-of-type(4) { grid-area: sold; text-align: left; }
+  .so-act { grid-area: act; justify-content: space-between; }
+  .hist { text-align: left; }
   .dl-pn { grid-area: pn; } .dl-desc { grid-area: desc; } .dl-ac { grid-area: ac; } .dl-st { grid-area: st; } .dl-qty { grid-area: qty; } .dl-x { grid-area: x; }
   .dgroup.sent .dline { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "chk pn pn pn" "chk desc desc desc" "chk ac st qty" "chk x x x"; }
   .dgroup.sent .dl-x { justify-content: flex-start; padding-top: 2px; }
@@ -760,8 +791,6 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
             <option value="active">In stock and reserved</option>
             <option value="stock">In stock</option>
             <option value="reserved">Reserved</option>
-            <option value="sold">Sold</option>
-            <option value="all">Everything</option>
           </select>
         </label>
         <label for="sac">Aircraft
@@ -788,6 +817,7 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
     </div>
     <div class="scrollbox" id="sscroll">
     <div id="drafts"></div>
+    <div id="soldbox"></div>
     <div class="results">
       <div class="shead" aria-hidden="true"><span>Part · description</span><span>Condition</span><span class="r">Qty</span><span>Serial no.</span><span>Location</span><span class="r">Cost</span><span class="r">Asking</span><span>Status</span></div>
       <div id="srows"></div>
@@ -1052,7 +1082,8 @@ function scoreEntry(e, clauses) {
 /* ---------- State ---------- */
 // ac: null until an aircraft is picked on the start screen, "" for all aircraft, else the aircraft id
 const S = { view: "pick", ac: null, lastAc: null, q: "", cat: "", sec: "", hideHw: true, priced: false, inStock: false, sort: "rel", shown: 60, sel: null };
-const W = { q: "", status: "active", ac: "", cond: "", loc: "", sort: "recent", shown: 100 };
+const W = { q: "", status: "active", ac: "", cond: "", loc: "", sort: "recent", shown: 100, soldOpen: false };
+try { W.soldOpen = localStorage.getItem("pf-sold-open") === "1"; } catch (_) {}
 try {
   const saved = JSON.parse(localStorage.getItem("ipc-finder-view") || "{}");
   if (typeof saved.hideHw === "boolean") S.hideHw = saved.hideHw;
@@ -1066,6 +1097,7 @@ const stock = new Map();  // id -> stock item
 const orders = new Map();
 const usedNos = new Set();   // every order code given out before // id -> customer order
 let stockByPn = new Map(); // pn -> {stock, reserved, sold, ids[]}
+let soldByPn = new Map();  // pn -> the sold items, newest first: what earlier ones were bought and sold for
 const pending = new Map();
 const tombs = new Map();   // sync: "o:<order id>" / "s:<stock id>" / "p:<part number>" -> when it was deleted
 let syncMark = {};         // online: when the last sync file was saved and loaded (kept in the page's storage, the same on every device)
@@ -1379,6 +1411,8 @@ function normStock(v) {
     cond: COND[v.cond] ? v.cond : "AR", grade: v.grade || "", condNote: v.condNote || "", serial: v.serial || "", loc: v.loc || "",
     from: v.from || "", received: v.received || "", buy: v.buy ?? null, sell: v.sell ?? null, status: STATUS[v.status] ? v.status : "stock",
     soldPrice: v.soldPrice ?? null, soldDate: v.soldDate || "", customer: v.customer || "", notes: v.notes || "", order: v.order || "",
+    // archived: a sold part taken off the Sold list on the Warehouse page; kept as a record of what it was bought and sold for
+    archived: !!v.archived && v.status === "sold",
     created: v.created || "", updated: v.updated || "",
   };
 }
@@ -1444,14 +1478,17 @@ function removeOrder(id) {
   updateListCount();
 }
 function reindexStock() {
-  const m = new Map();
+  const m = new Map(), sold = new Map();
   for (const it of stock.values()) {
     if (!m.has(it.pn)) m.set(it.pn, { stock: 0, reserved: 0, sold: 0, draft: 0, ids: [] });
     const x = m.get(it.pn);
     x[it.status] += it.qty;
     x.ids.push(it.id);
+    if (it.status === "sold") { if (!sold.has(it.pn)) sold.set(it.pn, []); sold.get(it.pn).push(it); }
   }
-  stockByPn = m;
+  // every sale of a part number, newest first (also the ones taken off the Sold list)
+  for (const arr of sold.values()) arr.sort((a, b) => (b.soldDate || "").localeCompare(a.soldDate || "") || (b.updated || "").localeCompare(a.updated || ""));
+  stockByPn = m; soldByPn = sold;
   syncDot();
   const nd = [...stock.values()].filter((it) => it.status === "draft").length;
   const dc = $("draftcount");
@@ -1591,10 +1628,19 @@ function rowHtml(e) {
   return '<div class="row' + (S.sel === e.idx ? " sel" : "") + '" data-i="' + e.idx + '">' +
     '<div class="c-pn"><span class="pn">' + esc(e.p) + '</span><button class="copy" type="button" data-copy="' + esc(e.p) + '" aria-label="Copy ' + esc(e.p) + '" title="Copy part number">' + COPY_SVG + "</button></div>" +
     '<div class="c-desc"><div class="desc">' + esc(e.d) + "</div>" + fitsHtml(e) + '<div class="ctx">' + ctxLine(e) + "</div></div>" +
-    '<div class="c-buy"><input class="price" inputmode="decimal" data-f="buy" data-pn="' + esc(e.p) + '" value="' + esc(money(r.buy)) + '" placeholder="0,00" aria-label="Buy price for ' + esc(e.p) + '"' + ro + "></div>" +
-    '<div class="c-sell"><input class="price" inputmode="decimal" data-f="sell" data-pn="' + esc(e.p) + '" value="' + esc(money(r.sell)) + '" placeholder="0,00" aria-label="Sell price for ' + esc(e.p) + '"' + ro + "></div>" +
+    '<div class="c-buy"><input class="price" inputmode="decimal" data-f="buy" data-pn="' + esc(e.p) + '" value="' + esc(money(r.buy)) + '" placeholder="0,00" aria-label="Buy price for ' + esc(e.p) + '"' + ro + ">" + lastSale(e.p, "buy") + "</div>" +
+    '<div class="c-sell"><input class="price" inputmode="decimal" data-f="sell" data-pn="' + esc(e.p) + '" value="' + esc(money(r.sell)) + '" placeholder="0,00" aria-label="Sell price for ' + esc(e.p) + '"' + ro + ">" + lastSale(e.p, "soldPrice") + "</div>" +
     '<div class="c-margin">' + mgHtml + "</div>" +
     '<div class="c-act">' + rqHtml(e.p) + '<button class="addlist' + (r.listed ? " on" : "") + '" type="button" data-addmenu="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '" aria-haspopup="menu"' + (Backend.canWrite ? "" : " disabled") + ">" + (r.listed ? "✓ Listed" : "+ Add") + "</button></div></div>";
+}
+// under Buy and Sell: what the last one sold was bought for and sold for
+function lastSale(pn, f) {
+  const hist = soldByPn.get(pn);
+  const x = hist && hist.find((it) => it[f] != null);
+  if (!x) return "";
+  const n = hist.reduce((s, it) => s + it.qty, 0);
+  const tip = (f === "buy" ? "Bought for " : "Sold for ") + EUR.format(x[f]) + (x.soldDate ? ", sold " + dateNl(x.soldDate) : "") + (n > 1 ? " · " + n + " sold so far" : "");
+  return '<small class="hist" title="' + esc(tip) + '">last ' + esc(EUR.format(x[f])) + "</small>";
 }
 // how many to add with "+ Add" (per part, back to 1 once added)
 const CQ = new Map();
@@ -1686,9 +1732,8 @@ function stockList() {
   const q = W.q.trim().toUpperCase();
   const qc = comp(q);
   let arr = [...stock.values()].filter((it) => {
-    if (it.status === "draft") return false;
-    if (W.status === "active" && it.status === "sold") return false;
-    if (W.status !== "active" && W.status !== "all" && it.status !== W.status) return false;
+    if (it.status === "draft" || it.status === "sold") return false;   // those have their own sections above the list
+    if ((W.status === "stock" || W.status === "reserved") && it.status !== W.status) return false;
     if (W.ac && it.ac !== W.ac) return false;
     if (W.cond && it.cond !== W.cond) return false;
     if (W.loc && it.loc !== W.loc) return false;
@@ -1722,7 +1767,47 @@ function srowHtml(it) {
     '<div class="c-txt">' + (esc(it.loc) || '<span style="color:var(--muted)">–</span>') + "</div>" +
     '<div class="c-money">' + (it.buy != null ? esc(EUR.format(it.buy)) : "–") + (it.qty > 1 && it.buy != null ? "<small>× " + it.qty + "</small>" : "") + "</div>" +
     '<div class="c-money">' + (sold ? (it.soldPrice != null ? esc(EUR.format(it.soldPrice)) + "<small>sold</small>" : "–") : (it.sell != null ? esc(EUR.format(it.sell)) : "–")) + "</div>" +
-    '<div><span class="status ' + it.status + '">' + esc(STATUS[it.status]) + "</span>" + (sold && it.soldDate ? '<div class="ctx">' + esc(dateNl(it.soldDate)) + "</div>" : "") + "</div></div>";
+    "<div>" + stSelect(it) + (sold && it.soldDate ? '<div class="ctx">' + esc(dateNl(it.soldDate)) + "</div>" : "") + "</div></div>";
+}
+// the status can be changed right in the list: In stock, Reserved, Sold
+function stSelect(it) {
+  return '<select class="stsel ' + it.status + '" data-st="' + esc(it.id) + '" aria-label="Status of ' + esc(it.pn) + '"' + (Backend.canWrite ? "" : " disabled") + ">" +
+    STATUSES.map(([v, l]) => '<option value="' + v + '"' + (v === it.status ? " selected" : "") + ">" + l + "</option>").join("") + "</select>";
+}
+function stockStatus(sel) {
+  const it = stock.get(sel.dataset.st);
+  if (!it || !Backend.canWrite || sel.value === it.status) { renderStock(); return; }
+  if (it.qty > 1) { sel.blur(); openCountPop(sel, it, sel.value); return; }   // several units: ask how many
+  setStockStatus(it, sel.value, 1);
+}
+function setStockStatus(it, to, n) {
+  // a sale keeps its date, and the asking price as the sold price until you fill in what it really went for
+  const extra = to === "sold" ? { soldDate: it.soldDate || today(), soldPrice: it.soldPrice ?? it.sell ?? null } : {};
+  const moved = { ...it, status: to, archived: false, ...extra };
+  if (n >= it.qty) putStock(moved);
+  else { putStock({ ...it, qty: it.qty - n }); putStock({ ...moved, id: newId(), qty: n, created: "" }); }
+  toast((n > 1 ? n + " × " : "") + it.pn + (to === "sold" ? " sold" : to === "reserved" ? " reserved" : " in stock"));
+  renderStock(); render();
+}
+// sold parts wait in "Sold" until you take them off; what they were bought and sold for stays on record
+function renderSold() {
+  const box = $("soldbox");
+  const ss = [...stock.values()].filter((it) => it.status === "sold" && !it.archived)
+    .sort((a, b) => (b.soldDate || "").localeCompare(a.soldDate || "") || (b.updated || "").localeCompare(a.updated || ""));
+  if (!ss.length) { box.innerHTML = ""; return; }
+  const n = ss.reduce((s, it) => s + it.qty, 0);
+  const ro = !Backend.canWrite;
+  box.innerHTML = '<div class="results soldsec"><button class="dhead soldtoggle" type="button" data-soldtoggle aria-expanded="' + W.soldOpen + '"><b>Sold</b><span class="muted">' + n + (n === 1 ? " unit" : " units") + '</span><span class="sp"></span><span class="chev" aria-hidden="true">' + (W.soldOpen ? "▴" : "▾") + "</span></button>" +
+    (W.soldOpen ? ss.map((it) => {
+      const e = entryOf(it.pn, it.ac);
+      const ctx = [it.customer ? esc(it.customer) : "", it.serial ? "SN " + esc(it.serial) : "", it.soldDate ? esc(dateNl(it.soldDate)) : ""].filter(Boolean).join(" · ");
+      return '<div class="solrow" data-sid="' + esc(it.id) + '">' +
+        '<div class="so-part' + (e ? ' c-part" title="Part information' : "") + '"><span class="pn">' + esc(it.pn) + "</span>" + (it.ac ? '<span class="tag ac">' + esc(acShort(it.ac)) + "</span>" : "") + '<div class="desc">' + esc(it.desc || (e ? e.d : "")) + "</div>" + (ctx ? '<div class="ctx">' + ctx + "</div>" : "") + "</div>" +
+        '<div class="so-qty mono">× ' + it.qty + "</div>" +
+        '<div class="so-m"><small>Bought</small>' + (it.buy != null ? esc(EUR.format(it.buy)) : "–") + "</div>" +
+        '<div class="so-m"><small>Sold for</small>' + (it.soldPrice != null ? esc(EUR.format(it.soldPrice)) : "–") + "</div>" +
+        '<div class="so-act">' + stSelect(it) + (ro ? "" : '<button class="xbtn" type="button" data-sarch="' + esc(it.id) + '" aria-label="Remove ' + esc(it.pn) + '" title="Remove">×</button>') + "</div></div>";
+    }).join("") : "") + "</div>";
 }
 // parts received from the dismantler wait here until they are booked in with their details
 function renderDrafts() {
@@ -1747,6 +1832,7 @@ function renderStock() {
   const all = [...stock.values()].filter((it) => it.status !== "draft");
   const active = all.filter((it) => it.status !== "sold");
   renderDrafts();
+  renderSold();
   // free to sell, promised to a customer order, received and waiting for its details; a tap filters the list
   const units = (st) => [...stock.values()].filter((it) => it.status === st).reduce((s, it) => s + it.qty, 0);
   const toBook = units("draft");
@@ -1760,8 +1846,8 @@ function renderStock() {
   sloc.innerHTML = '<option value="">Any</option>' + locs.map((l) => '<option value="' + esc(l) + '"' + (l === curLoc ? " selected" : "") + ">" + esc(l) + "</option>").join("");
   const list = stockList();
   $("addstock").disabled = !Backend.canWrite;
-  if (!all.length) {
-    $("srows").innerHTML = '<div class="empty"><h3>No stock yet</h3></div>';
+  if (!active.length) {
+    $("srows").innerHTML = '<div class="empty"><h3>' + (all.length ? "Nothing in stock" : "No stock yet") + "</h3></div>";
   } else if (!list.length) {
     $("srows").innerHTML = '<div class="empty"><h3>Nothing matches</h3></div>';
   } else {
@@ -1975,12 +2061,27 @@ function pdfCell(ac, fileIdx, page) {
 }
 function unitsHtml(pn) {
   const st = stockByPn.get(pn);
-  const items = st ? st.ids.map((id) => stock.get(id)).filter(Boolean).sort((a, b) => (a.status === "sold") - (b.status === "sold") || (b.updated || "").localeCompare(a.updated || "")) : [];
+  const items = st ? st.ids.map((id) => stock.get(id)).filter((it) => it && !it.archived).sort((a, b) => (a.status === "sold") - (b.status === "sold") || (b.updated || "").localeCompare(a.updated || "")) : [];
   return '<div class="sec"><h4>In the warehouse' + (st ? " (" + (st.stock + st.reserved) + " on the shelf" + (st.sold ? ", " + st.sold + " sold" : "") + ")" : "") + "</h4>" +
     items.map((it) => '<button class="unitrow" type="button" data-sid="' + esc(it.id) + '">' + condBadge(it.cond) + (it.grade ? '<span class="grade">grade ' + esc(it.grade) + "</span>" : "") +
       "<span>×" + esc(it.qty) + "</span>" + (it.serial ? '<span class="mono">SN ' + esc(it.serial) + "</span>" : "") + (it.loc ? "<span>" + esc(it.loc) + "</span>" : "") + (it.from ? '<span style="color:var(--muted)">from ' + esc(it.from) + "</span>" : "") +
       '<span class="sp"></span><span class="status ' + it.status + '">' + esc(STATUS[it.status]) + "</span></button>").join("") +
-    (Backend.canWrite ? '<div class="listactions" style="margin-top:6px"><button class="btn" type="button" id="d-addstock">Add to stock</button></div>' : "") + "</div>";
+    (Backend.canWrite ? '<div class="listactions" style="margin-top:6px"><button class="btn" type="button" id="d-addstock">Add to stock</button></div>' : "") + "</div>" + salesHtml(pn);
+}
+// every earlier sale of this part: what it was bought for and sold for, to price the next one
+function salesHtml(pn) {
+  const hist = soldByPn.get(pn);
+  if (!hist || !hist.length) return "";
+  const eur = (v) => (v == null ? "–" : esc(EUR.format(v)));
+  const rows = hist.map((it) => {
+    const m = it.buy != null && it.soldPrice != null ? it.soldPrice - it.buy : null;
+    return "<tr><td>" + (esc(dateNl(it.soldDate)) || "–") + "</td><td>" + it.qty + "</td><td>" + condBadge(it.cond) + '</td><td class="mono">' + (esc(it.serial) || "–") + '</td><td class="r">' + eur(it.buy) + '</td><td class="r">' + eur(it.soldPrice) + '</td><td class="r">' + (m == null ? "–" : '<span class="' + (m >= 0 ? "pos" : "neg") + '">' + esc(EUR.format(m)) + "</span>") + "</td></tr>";
+  }).join("");
+  // averages per unit over the sales that have the price
+  const avg = (f) => { const xs = hist.filter((it) => it[f] != null); const n = xs.reduce((s, it) => s + it.qty, 0); return n ? xs.reduce((s, it) => s + it[f] * it.qty, 0) / n : null; };
+  const units = hist.reduce((s, it) => s + it.qty, 0);
+  const foot = hist.length > 1 ? '<tfoot><tr><td colspan="4">Average per unit</td><td class="r">' + eur(avg("buy")) + '</td><td class="r">' + eur(avg("soldPrice")) + "</td><td></td></tr></tfoot>" : "";
+  return '<div class="sec"><h4>Sold before (' + units + ")</h4>" + '<div class="tablewrap"><table class="occ sales"><thead><tr><th>Sold</th><th>Qty</th><th>Cond.</th><th>Serial</th><th class="r">Bought</th><th class="r">Sold for</th><th class="r">Margin</th></tr></thead><tbody>' + rows + "</tbody>" + foot + "</table></div></div>";
 }
 function renderDetail(e, keepScroll) {
   const sh = $("detail");
@@ -3816,11 +3917,25 @@ function toggleList(pn) {
 }
 function setQty(pn, q) { q = Math.max(1, Math.min(999, Math.round(q) || 1)); setRec(pn, { qty: q, listed: true }); }
 /* "+ Add" on a catalogue part: choose where it goes - the warehouse, a customer order or the dismantler list */
-const AM = { el: null, btn: null, pn: "", ac: "" };
+const AM = { el: null, btn: null, pn: "", ac: "", t0: 0, onClose: null };
 function closeAddMenu() {
   if (!AM.el) return;
   AM.el.remove(); AM.el = null;
   if (AM.btn) { AM.btn.classList.remove("open"); AM.btn.setAttribute("aria-expanded", "false"); AM.btn = null; }
+  const f = AM.onClose; AM.onClose = null;
+  if (f) f();
+}
+// a small menu under the thing tapped, kept on the screen (above it when there is no room below)
+function placeMenu(el, anchor) {
+  document.body.appendChild(el);
+  const b = anchor.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const x = Math.min(window.innerWidth - w - 8, Math.max(8, b.right - w));
+  let y = b.bottom + 6;
+  if (y + h > vh - 8) y = b.top - h - 6;
+  y = Math.max(8, Math.min(vh - h - 8, y));
+  el.style.left = x + "px"; el.style.top = y + "px";
+  AM.el = el; AM.t0 = Date.now();
 }
 function openAddMenu(btn) {
   closeAddMenu();
@@ -3830,22 +3945,35 @@ function openAddMenu(btn) {
   const el = document.createElement("div");
   el.className = "amenu"; el.id = "addmenu"; el.setAttribute("role", "menu");
   el.innerHTML = '<div class="amh">Add ' + (q > 1 ? q + " × " : "") + '<span class="mono">' + esc(pn) + "</span> to</div>" +
-    '<button type="button" role="menuitem" data-am="stock">Warehouse<small>' + (have ? have + " in stock · " : "") + "to book in</small></button>" +
+    '<button type="button" role="menuitem" data-am="stock">Warehouse' + (have ? "<small>" + have + " in stock</small>" : "") + "</button>" +
     '<div class="amg">Orders</div>' +
     open.map((o) => '<button type="button" role="menuitem" data-am="order" data-amo="' + esc(o.id) + '"><span class="amc">' + esc(o.customer || "No customer") + '</span><small class="mono">' + esc(o.no) + "</small></button>").join("") +
     '<button type="button" role="menuitem" data-am="neworder">+ New order</button>' +
     '<div class="amsep"></div>' +
-    '<button type="button" role="menuitem" data-am="dism">Dismantler list' + (r.listed ? "<small>✓ listed · tap to take off</small>" : "") + "</button>";
-  document.body.appendChild(el);
-  Object.assign(AM, { el, btn, pn, ac, q });
+    '<button type="button" role="menuitem" data-am="dism">Dismantler' + (r.listed ? "<small>✓</small>" : "") + "</button>";
+  Object.assign(AM, { btn, pn, ac, q });
+  placeMenu(el, btn);
   btn.classList.add("open"); btn.setAttribute("aria-expanded", "true");
-  // under the button, kept on the screen (above it when there is no room below)
-  const b = btn.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
-  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const x = Math.min(window.innerWidth - w - 8, Math.max(8, b.right - w));
-  let y = b.bottom + 6;
-  if (y + h > vh - 8) y = Math.max(8, b.top - h - 6);
-  el.style.left = x + "px"; el.style.top = y + "px";
+}
+// changing the status of a line with several units: how many of them
+function openCountPop(sel, it, to) {
+  closeAddMenu();
+  const el = document.createElement("div");
+  el.className = "amenu countpop"; el.id = "addmenu"; el.setAttribute("role", "dialog");
+  el.innerHTML = '<div class="amh">' + esc(STATUS[to]) + " · how many of " + it.qty + "?</div>" +
+    '<div class="cprow"><span class="qty big"><button type="button" data-cq="-1" aria-label="Fewer">−</button><output>' + it.qty + '</output><button type="button" data-cq="1" aria-label="More" disabled>+</button></span>' +
+    '<button class="btn primary" type="button" data-cqok>OK</button></div>';
+  Object.assign(AM, { cnt: { it, to, n: it.qty }, onClose: () => renderStock() });   // closed without OK: the status stays
+  placeMenu(el, sel);
+}
+function countPick(b) {
+  const c = AM.cnt;
+  if (!c) return;
+  if (b.hasAttribute("data-cqok")) { AM.onClose = null; closeAddMenu(); setStockStatus(c.it, c.to, c.n); return; }
+  c.n = Math.max(1, Math.min(c.it.qty, c.n + +b.dataset.cq));
+  AM.el.querySelector("output").value = String(c.n);
+  AM.el.querySelector('[data-cq="-1"]').disabled = c.n <= 1;
+  AM.el.querySelector('[data-cq="1"]').disabled = c.n >= c.it.qty;
 }
 function addMenuPick(b) {
   const { pn, ac, q } = AM, kind = b.dataset.am;
@@ -3883,10 +4011,13 @@ document.addEventListener("click", (ev) => {
   if (!AM.el) return;
   ev.stopPropagation(); ev.preventDefault();
   const mb = ev.target.closest("#addmenu button");
-  if (mb) addMenuPick(mb); else if (!ev.target.closest("#addmenu")) closeAddMenu();
+  if (mb) { if (mb.dataset.am) addMenuPick(mb); else countPick(mb); }
+  else if (!ev.target.closest("#addmenu")) closeAddMenu();
 }, true);
-document.addEventListener("scroll", closeAddMenu, true);
-window.addEventListener("resize", closeAddMenu);
+// scrolling closes it (not in the first moments: a phone's select wheel closing can move the page a little)
+const closeOnMove = () => { if (AM.el && Date.now() - AM.t0 > 700) closeAddMenu(); };
+document.addEventListener("scroll", closeOnMove, true);
+window.addEventListener("resize", closeOnMove);
 function setView(v) {
   closeAddMenu();
   if (v === "parts" && S.ac == null) v = "pick";      // the catalogue needs an aircraft first
@@ -4043,8 +4174,18 @@ document.addEventListener("click", (ev) => {
     const it = stock.get(dd.dataset.ddiscard); removeStock(dd.dataset.ddiscard); renderStock(); render(); if (it) toast("Discarded " + it.pn);
     return;
   }
-  const sp = t.closest(".srow .c-part");
-  if (sp) { const it = stock.get(sp.parentNode.dataset.sid); const i = it ? entryIdx(it.pn, it.ac) : null; if (i != null) { openDetail(i); return; } }
+  if (t.closest("[data-soldtoggle]")) { W.soldOpen = !W.soldOpen; try { localStorage.setItem("pf-sold-open", W.soldOpen ? "1" : "0"); } catch (_) {} renderSold(); return; }
+  const sa = t.closest("[data-sarch]");
+  if (sa) {
+    if (Backend.local && !Backend.archiveOk) { toast("Close the program and open it again first."); return; }
+    if (sa.dataset.arm !== "1") { sa.dataset.arm = "1"; sa.textContent = "Remove?"; sa.classList.add("arm"); setTimeout(() => { if (sa.isConnected) { sa.dataset.arm = ""; sa.textContent = "×"; sa.classList.remove("arm"); } }, 3000); return; }
+    const it = stock.get(sa.dataset.sarch);
+    if (it) { putStock({ ...it, archived: true }); renderStock(); render(); toast("Removed " + it.pn + " · its prices stay on record"); }
+    return;
+  }
+  if (t.closest("select, input, textarea")) { if (t.closest("[data-sid]")) return; }
+  const sp = t.closest(".srow .c-part, .solrow .c-part");
+  if (sp) { const it = stock.get(sp.closest("[data-sid]").dataset.sid); const i = it ? entryIdx(it.pn, it.ac) : null; if (i != null) { openDetail(i); return; } }
   const su = t.closest("[data-sid]");
   if (su && !t.closest("input, select, textarea")) { const it = stock.get(su.dataset.sid); if (it) openStockForm(it, su.classList.contains("unitrow") ? S.sel : null); return; }
   if (t.closest("[data-close]")) { const back = SF && SF.returnTo; closeSheets(); if (back != null) openDetail(back); return; }
@@ -4119,6 +4260,7 @@ document.addEventListener("input", (ev) => {
 });
 document.addEventListener("change", (ev) => {
   const t = ev.target;
+  if (t.classList && t.classList.contains("stsel")) { stockStatus(t); return; }
   if (t.id === "sf-status") { $("sf-soldbox").hidden = t.value !== "sold"; if (t.value === "sold" && !$("sf-solddate").value) $("sf-solddate").value = today(); return; }
   if (t.id && t.id.startsWith("sf-")) return;
   if (t.id === "co-logofile") { loadLogo(t.files && t.files[0]); return; }
