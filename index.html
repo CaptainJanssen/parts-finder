@@ -212,6 +212,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .filters { padding-bottom: 10px; }
 }
 
+/* Phones: the header with the tabs stays at the top, clear of the phone's status bar; everything below it scrolls,
+   and the search box stays in view under the header */
+@media (max-width: 760px), (max-height: 519px) {
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; overflow: hidden; height: 100dvh; }
+  .plate { flex: none; z-index: 6; }
+  main.wrap { flex: 1 1 auto; min-height: 0; width: 100%; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom, 0px); }
+}
+
 .rhead, .row { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(0, 3fr) 96px 96px 104px 84px; gap: 12px; align-items: center; padding: 10px 14px; }
 .rhead, .shead { font-family: var(--f-display); text-transform: uppercase; letter-spacing: .12em; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .rhead .r, .shead .r { text-align: right; }
@@ -754,6 +763,7 @@ const AC_OPTIONS = [...ACS.map((a) => [a.id, a.name]), ["OTHER", "Other aircraft
 function secTitle(ac, sec) { const a = AC[ac]; return (a && a.sections[sec] && a.sections[sec].title) || sec; }
 const CAT_SHORT = { install: "Installation", panel: "Panel part", instr: "Instrument", control: "Control", light: "Light", placard: "Placard", furn: "Furnishing", elec: "Electrical", struct: "Structure", hw: "Hardware", other: "Other" };
 const $ = (id) => document.getElementById(id);
+const MAIN = document.querySelector("main.wrap");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const COPY_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>';
 const EUR = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1498,7 +1508,7 @@ function rowHtml(e) {
 let lastSig = "";
 function render() {
   const sig = JSON.stringify([S.ac, S.q.trim(), S.cat, S.sec, S.hideHw, S.priced, S.inStock, S.sort]);
-  if (sig !== lastSig) { lastSig = sig; $("pscroll").scrollTop = 0; }
+  if (sig !== lastSig) { lastSig = sig; $("pscroll").scrollTop = 0; MAIN.scrollTop = 0; }
   const res = compute();
   lastResults = res.list;
   const allCount = res.hiddenHw ? res.total - res.hiddenHw : res.total;
@@ -1626,7 +1636,7 @@ function renderDrafts() {
 let lastStockSig = "";
 function renderStock() {
   const ssig = JSON.stringify([W.q.trim(), W.status, W.ac, W.cond, W.loc, W.sort]);
-  if (ssig !== lastStockSig) { lastStockSig = ssig; $("sscroll").scrollTop = 0; }
+  if (ssig !== lastStockSig) { lastStockSig = ssig; $("sscroll").scrollTop = 0; MAIN.scrollTop = 0; }
   const all = [...stock.values()].filter((it) => it.status !== "draft");
   const active = all.filter((it) => it.status !== "sold");
   renderDrafts();
@@ -2476,12 +2486,12 @@ function orderPick(oid, pn, ac) {
 function orderClick(t) {
   const q = (sel) => t.closest(sel);
   let b;
-  if ((b = q("[data-ltab]"))) { L.tab = b.dataset.ltab; renderOrders(); $("oscroll").scrollTop = 0; return true; }
+  if ((b = q("[data-ltab]"))) { L.tab = b.dataset.ltab; renderOrders(); $("oscroll").scrollTop = 0; MAIN.scrollTop = 0; return true; }
   if ((b = q("[data-ofilter]"))) { L.filter = b.dataset.ofilter; renderOrders(); return true; }
   if (q("[data-onew]")) {
     if (!ordersReady()) return true;
     if (!L.creating) L.newNo = newOrderNo();
-    L.creating = true; L.tab = "orders"; renderOrders(); $("oscroll").scrollTop = 0; window.scrollTo(0, 0);
+    L.creating = true; L.tab = "orders"; renderOrders(); $("oscroll").scrollTop = 0; MAIN.scrollTop = 0;
     $("on-customer")?.focus(); return true;
   }
   if (q("[data-ocancel]")) { L.creating = false; renderOrders(); return true; }
@@ -3183,6 +3193,7 @@ function toggleList(pn) {
 function setQty(pn, q) { q = Math.max(1, Math.min(999, Math.round(q) || 1)); setRec(pn, { qty: q, listed: true }); }
 function setView(v) {
   if (v === "parts" && S.ac == null) v = "pick";      // the catalogue needs an aircraft first
+  if (S.view !== v) MAIN.scrollTop = 0;               // phones: each view starts at its top
   S.view = v;
   $("view-pick").hidden = v !== "pick";
   $("view-parts").hidden = v !== "parts";
@@ -3253,16 +3264,20 @@ $("acbtn").addEventListener("click", () => { closeSheets(); setView("pick"); });
 // near the bottom of the list the next part numbers load by themselves
 let moreBusy = false;
 function nearBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight < 400; }
-$("pscroll").addEventListener("scroll", () => {
-  if (moreBusy || !nearBottom($("pscroll")) || lastResults.length <= S.shown) return;
+function moreParts(el) {
+  if (moreBusy || !nearBottom(el) || lastResults.length <= S.shown) return;
   moreBusy = true;
   requestAnimationFrame(() => { S.shown += 60; render(); moreBusy = false; });
-}, { passive: true });
-$("sscroll").addEventListener("scroll", () => {
-  if (moreBusy || !nearBottom($("sscroll")) || $("smore").hidden || !$("smoreb")) return;
+}
+function moreStock(el) {
+  if (moreBusy || !nearBottom(el) || $("smore").hidden || !$("smoreb")) return;
   moreBusy = true;
   requestAnimationFrame(() => { W.shown += 100; renderStock(); moreBusy = false; });
-}, { passive: true });
+}
+$("pscroll").addEventListener("scroll", () => moreParts($("pscroll")), { passive: true });
+$("sscroll").addEventListener("scroll", () => moreStock($("sscroll")), { passive: true });
+// on phones the whole area under the header scrolls
+MAIN.addEventListener("scroll", () => { if (S.view === "parts") moreParts(MAIN); else if (S.view === "stock") moreStock(MAIN); }, { passive: true });
 $("pickgrid").addEventListener("click", (ev) => { const b = ev.target.closest("[data-pickac]"); if (b) chooseAircraft(b.dataset.pickac); });
 $("sac").addEventListener("change", (ev) => { W.ac = ev.target.value; renderStock(); });
 $("scond").innerHTML = '<option value="">Any</option>' + CONDS.map((c) => '<option value="' + c[0] + '">' + c[0] + " – " + esc(c[1]) + "</option>").join("");
