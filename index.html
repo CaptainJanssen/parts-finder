@@ -3966,36 +3966,74 @@ if (navigator.maxTouchPoints > 0) {
   // iPad and iPhone ignore "no zooming" in the page settings, so a pinch is stopped here
   ["gesturestart", "gesturechange", "gestureend"].forEach((t) => document.addEventListener(t, (ev) => ev.preventDefault(), { passive: false }));
   document.addEventListener("touchmove", (ev) => { if (ev.touches.length > 1 && !ev.target.closest(".dvstage")) ev.preventDefault(); }, { passive: false });
-  // When the keyboard opens, iPad and iPhone move the whole page up to show the field, and after it closes the page can
-  // stay moved: then every tap lands a field lower than it looks. The page itself never scrolls (only the lists and
-  // forms inside it do), so as soon as the keyboard is down, it is put back. The keyboard can be put away while a field
-  // still has the cursor (the iPad's keyboard key), so this goes by whether the keyboard is showing, not by the cursor.
+  // The on-screen keyboard. iPad and iPhone show it over the page and then move the page around to show the field; after
+  // it closes the page could stay moved, so taps landed a field lower than they looked. So while the keyboard is up,
+  // the app and the open form are fitted to the part of the screen above the keyboard (everything stays reachable and
+  // scrolls inside the form), the field being typed in is scrolled into view there, and when the keyboard goes down
+  // all of it is put back exactly. The keyboard is told by the visible height shrinking, not by the cursor: the iPad's
+  // keyboard key puts the keyboard away while the cursor stays in the field.
   const typing = () => { const a = document.activeElement; return !!a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable); };
   const vv = window.visualViewport;
-  const keyboardUp = () => (vv ? window.innerHeight - vv.height > 120 : typing());
-  const settle = () => {
+  let fullH = vv ? vv.height : 0, fitted = false;
+  const keyboardUp = () => !!vv && typing() && fullH - vv.height > 120;
+  const layers = () => [document.body, ...document.querySelectorAll(".sheet:not([hidden]), #scanview:not([hidden]), #drawview:not([hidden])")];
+  function scrollBoxOf(el) {
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const o = getComputedStyle(p).overflowY;
+      if ((o === "auto" || o === "scroll") && p.scrollHeight > p.clientHeight) return p;
+    }
+    return null;
+  }
+  function reveal() {
+    const a = document.activeElement;
+    if (!fitted || !a || !typing()) return;
+    const box = scrollBoxOf(a);
+    if (!box) return;
+    const r = a.getBoundingClientRect(), c = box.getBoundingClientRect();
+    const top = Math.max(c.top, vv.offsetTop) + 12, bottom = Math.min(c.bottom, vv.offsetTop + vv.height) - 16;
+    if (r.bottom > bottom) box.scrollTop += r.bottom - bottom;
+    else if (r.top < top) box.scrollTop -= top - r.top;
+  }
+  function fit() {
+    if (!vv) return;
+    if (!typing() && vv.height > fullH - 40) fullH = vv.height;          // the screen without a keyboard
+    if (keyboardUp()) {
+      const t = vv.offsetTop + "px", h = vv.height + "px";
+      for (const el of layers()) {
+        if (el === document.body) { el.style.position = "fixed"; el.style.left = "0"; el.style.right = "0"; }
+        el.style.top = t; el.style.height = h; el.style.bottom = "auto";
+      }
+      fitted = true;
+      requestAnimationFrame(reveal);
+    } else if (fitted) {
+      for (const el of [document.body, ...document.querySelectorAll(".sheet, #scanview, #drawview")]) {
+        el.style.position = el.style.left = el.style.right = el.style.top = el.style.height = el.style.bottom = "";
+      }
+      fitted = false;
+      settle();
+      // redraw the open form in place, so its tap areas match what is shown
+      document.querySelectorAll(".sheet:not([hidden]), #scanview:not([hidden])").forEach((el) => {
+        el.style.transform = "translateZ(0)";
+        requestAnimationFrame(() => { el.style.transform = ""; });
+      });
+    }
+  }
+  // without the keyboard the page itself never scrolls (only the lists and forms inside it), so it is kept at the top
+  function settle() {
     if (keyboardUp()) return;
     if (window.scrollY || window.scrollX || document.documentElement.scrollTop || document.body.scrollTop) {
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
     }
-  };
-  const settleSoon = () => { setTimeout(settle, 60); setTimeout(settle, 300); setTimeout(settle, 700); };
-  document.addEventListener("focusout", settleSoon);
-  document.addEventListener("focusin", settleSoon);
-  // when the keyboard goes down, the open form is also redrawn in place, so its tap areas match what is shown
-  let kbWas = false;
-  const redraw = () => document.querySelectorAll(".sheet:not([hidden]), #scanview:not([hidden])").forEach((el) => {
-    el.style.transform = "translateZ(0)";
-    requestAnimationFrame(() => { el.style.transform = ""; });
-  });
-  if (vv) {
-    vv.addEventListener("resize", () => { const up = keyboardUp(); if (kbWas && !up) { settle(); redraw(); } kbWas = up; settleSoon(); });
-    vv.addEventListener("scroll", () => setTimeout(settle, 60));
   }
-  window.addEventListener("scroll", () => requestAnimationFrame(settle), { passive: true });
-  window.addEventListener("orientationchange", () => setTimeout(settle, 300));
+  const soon = () => { fit(); setTimeout(fit, 120); setTimeout(fit, 450); setTimeout(settle, 700); };
+  if (vv) { vv.addEventListener("resize", soon); vv.addEventListener("scroll", fit); }
+  document.addEventListener("focusin", () => { soon(); setTimeout(reveal, 600); });
+  document.addEventListener("focusout", () => setTimeout(soon, 50));
+  window.addEventListener("scroll", () => { if (!keyboardUp()) requestAnimationFrame(settle); }, { passive: true });
+  window.addEventListener("orientationchange", () => { fullH = 0; setTimeout(() => { if (vv && !typing()) fullH = vv.height; soon(); }, 400); });
+  window.addEventListener("resize", () => { if (vv && !typing()) fullH = vv.height; });
   // A button in a form or the scanner reacts on the touch itself. Otherwise the keyboard or a picker closing at that
   // moment moves the form, and the tap is lost (Save had to be pressed twice, or only worked after a moment).
   let tap = null;
