@@ -264,7 +264,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* Warehouse */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; padding-block: 20px 6px; }
-#tiles { grid-template-columns: minmax(160px, 260px); }
+#tiles { grid-template-columns: repeat(3, minmax(0, 200px)); }
+@media (max-width: 760px) { #tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tilebtn { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.tilebtn .k, .tilebtn .v { display: block; }
+.tilebtn:hover:not(:disabled) { border-color: var(--muted); }
+.tilebtn[aria-pressed="true"] { border-color: var(--focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 22%, transparent); }
+.tilebtn:disabled { cursor: default; }
+.tilebtn.todo { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); background: var(--amber-bg); }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
 .tile .k { font-family: var(--f-display); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; color: var(--muted); }
 .tile .v { font-family: var(--f-mono); font-size: 21px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -1690,8 +1697,11 @@ function renderStock() {
   const all = [...stock.values()].filter((it) => it.status !== "draft");
   const active = all.filter((it) => it.status !== "sold");
   renderDrafts();
-  const units = active.reduce((s, it) => s + it.qty, 0);
-  $("tiles").innerHTML = '<div class="tile"><div class="k">Units on the shelf</div><div class="v">' + units + "</div></div>";
+  // free to sell, promised to a customer order, received and waiting for its details; a tap filters the list
+  const units = (st) => [...stock.values()].filter((it) => it.status === st).reduce((s, it) => s + it.qty, 0);
+  const toBook = units("draft");
+  const tile = (key, label, n, cls, dis) => '<button class="tile tilebtn' + (cls || "") + '" type="button" data-wtile="' + key + '" aria-pressed="' + (W.status === key) + '"' + (dis ? " disabled" : "") + '><span class="k">' + label + '</span><span class="v">' + n + "</span></button>";
+  $("tiles").innerHTML = tile("stock", "Available", units("stock")) + tile("reserved", "Reserved", units("reserved")) + tile("draft", "To book in", toBook, toBook ? " todo" : "", !toBook);
   // filter options
   const locs = [...new Set(all.map((it) => it.loc).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
   $("sac").innerHTML = '<option value="">Any</option>' + AC_OPTIONS.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === W.ac ? " selected" : "") + ">" + esc(l) + "</option>").join("");
@@ -3863,6 +3873,21 @@ document.addEventListener("click", (ev) => {
   if (t.id === "showall") { S.shown = 100000; render(); return; }
   if (t.id === "smoreb") { W.shown = 100000; renderStock(); return; }
   if (t.id === "showhw") { S.hideHw = false; $("hidehw").checked = false; remember(); render(); return; }
+  const wt = t.closest("[data-wtile]");
+  if (wt) {
+    if (wt.dataset.wtile === "draft") {
+      // to the parts waiting to be booked in, just under the search bar (which stays at the top on phones)
+      if (getComputedStyle(MAIN).overflowY === "auto") {
+        const bar = document.querySelector("#view-stock .searchzone").getBoundingClientRect().bottom;
+        MAIN.scrollTo({ top: MAIN.scrollTop + $("drafts").getBoundingClientRect().top - bar - 8, behavior: "smooth" });
+      } else $("drafts").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    W.status = W.status === wt.dataset.wtile ? "active" : wt.dataset.wtile;
+    $("sstatus").value = W.status;
+    renderStock();
+    return;
+  }
   if (orderClick(t)) return;
   if (t.id === "copycsv") { copyText($("csvtext").value, $("csvtext")); return; }
   if (t.closest("#syncbtn")) { openSync(); return; }
