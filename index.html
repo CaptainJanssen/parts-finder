@@ -3968,19 +3968,33 @@ if (navigator.maxTouchPoints > 0) {
   document.addEventListener("touchmove", (ev) => { if (ev.touches.length > 1 && !ev.target.closest(".dvstage")) ev.preventDefault(); }, { passive: false });
   // When the keyboard opens, iPad and iPhone move the whole page up to show the field, and after it closes the page can
   // stay moved: then every tap lands a field lower than it looks. The page itself never scrolls (only the lists and
-  // forms inside it do), so as soon as nothing is being typed in, it is put back.
+  // forms inside it do), so as soon as the keyboard is down, it is put back. The keyboard can be put away while a field
+  // still has the cursor (the iPad's keyboard key), so this goes by whether the keyboard is showing, not by the cursor.
   const typing = () => { const a = document.activeElement; return !!a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable); };
+  const vv = window.visualViewport;
+  const keyboardUp = () => (vv ? window.innerHeight - vv.height > 120 : typing());
   const settle = () => {
-    if (typing()) return;
+    if (keyboardUp()) return;
     if (window.scrollY || window.scrollX || document.documentElement.scrollTop || document.body.scrollTop) {
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
     }
   };
-  document.addEventListener("focusout", () => { setTimeout(settle, 80); setTimeout(settle, 400); });
-  if (window.visualViewport) window.visualViewport.addEventListener("resize", () => { setTimeout(settle, 80); setTimeout(settle, 400); });
-  window.addEventListener("scroll", () => { if (!typing()) requestAnimationFrame(settle); }, { passive: true });
+  const settleSoon = () => { setTimeout(settle, 60); setTimeout(settle, 300); setTimeout(settle, 700); };
+  document.addEventListener("focusout", settleSoon);
+  document.addEventListener("focusin", settleSoon);
+  // when the keyboard goes down, the open form is also redrawn in place, so its tap areas match what is shown
+  let kbWas = false;
+  const redraw = () => document.querySelectorAll(".sheet:not([hidden]), #scanview:not([hidden])").forEach((el) => {
+    el.style.transform = "translateZ(0)";
+    requestAnimationFrame(() => { el.style.transform = ""; });
+  });
+  if (vv) {
+    vv.addEventListener("resize", () => { const up = keyboardUp(); if (kbWas && !up) { settle(); redraw(); } kbWas = up; settleSoon(); });
+    vv.addEventListener("scroll", () => setTimeout(settle, 60));
+  }
+  window.addEventListener("scroll", () => requestAnimationFrame(settle), { passive: true });
   window.addEventListener("orientationchange", () => setTimeout(settle, 300));
   // A button in a form or the scanner reacts on the touch itself. Otherwise the keyboard or a picker closing at that
   // moment moves the form, and the tap is lost (Save had to be pressed twice, or only worked after a moment).
