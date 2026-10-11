@@ -442,8 +442,11 @@ table.occ tr:last-child td { border-bottom: 0; }
 .xent { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; margin-top: 12px; }
 #sf-main0.xent { margin-top: 0; }
 .xhead { display: flex; align-items: center; gap: 8px; min-height: 34px; margin-bottom: 10px; font-size: 13.5px; font-weight: 600; }
-.xhead .qty button { width: 36px; height: 34px; font-size: 17px; color: var(--ink); }
 .xhead .sp { flex: 1; }
+.xhead.sn, .xhead .sn { font-family: var(--f-mono); }
+/* date boxes stay inside their frame on the iPad too (Safari gives them a fixed width of their own) */
+.formgrid input, .formgrid select { min-width: 0; max-width: 100%; }
+@media (pointer: coarse) { .formgrid input[type="date"] { display: block; width: 100%; -webkit-appearance: none; appearance: none; min-height: 40px; text-align: left; } .formgrid input[type="date"]::-webkit-date-and-time-value { text-align: left; } }
 #sf-addx { margin-top: 12px; }
 .listactions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 /* Orders page */
@@ -1832,18 +1835,27 @@ function sfDraw() {
   $("sf-qty").value = String(SF.qty);
   const dn = $("stocksheet").querySelector('[data-sfq="-1"]');
   if (dn && !ro) dn.disabled = main <= 1 && !SF.extra.some((x) => x.n > 1);
-  // with extra entries the first set of boxes gets the same frame, showing the units it keeps
+  // with extra entries the first set of boxes gets the same frame; each box is titled with its serial number or its units
   $("sf-main0").classList.toggle("xent", SF.extra.length > 0);
   $("sf-mainn").hidden = !SF.extra.length;
-  $("sf-mainn").textContent = units(main);
   if ($("sf-addx")) $("sf-addx").hidden = main < 2;
-  $("sf-extra").innerHTML = SF.extra.map((x, i) => '<div class="xent"><div class="xhead"><span class="qty"><button type="button" data-xq="-1" data-x="' + i + '" aria-label="Fewer"' + (ro || (x.n <= 1 ? " disabled" : "")) + ">−</button><output>" + x.n + '</output><button type="button" data-xq="1" data-x="' + i + '" aria-label="More"' + (ro || (main <= 1 ? " disabled" : "")) + ">+</button></span>" +
-    (x.n === 1 ? "unit" : "units") + '<span class="sp"></span>' + (ro ? "" : '<button class="xbtn" type="button" data-xdel="' + i + '" aria-label="Remove entry">×</button>') + '</div><div class="formgrid">' +
+  $("sf-extra").innerHTML = SF.extra.map((x, i) => '<div class="xent"><div class="xhead"><span class="xname" data-xh="' + i + '"></span><span class="sp"></span>' + (ro ? "" : '<button class="xbtn" type="button" data-xdel="' + i + '" aria-label="Remove entry">×</button>') + '</div><div class="formgrid">' +
     '<label class="field">Serial number<input class="m" data-x="' + i + '" data-xf="serial" value="' + esc(x.serial) + '"' + ro + "></label>" +
     '<label class="field">Location<input list="sf-locs" data-x="' + i + '" data-xf="loc" value="' + esc(x.loc) + '"' + ro + "></label>" +
     '<label class="field">Removed from aircraft<input list="sf-froms" data-x="' + i + '" data-xf="from" value="' + esc(x.from) + '" placeholder="Registration or MSN"' + ro + "></label>" +
     '<label class="field">Date received<input type="date" data-x="' + i + '" data-xf="received" value="' + esc(x.received) + '"' + ro + "></label>" +
     "</div></div>").join("");
+  sfHeads();
+}
+function sfHeads() {
+  const units = (n) => n + (n === 1 ? " unit" : " units");
+  const head = (el, serial, n) => {
+    const sn = (serial || "").trim();
+    el.textContent = sn ? (/^s\/?n/i.test(sn) ? sn : "SN " + sn) + (n > 1 ? " · " + units(n) : "") : units(n);
+    el.classList.toggle("sn", !!sn);
+  };
+  head($("sf-mainn"), $("sf-serial").value, sfMain());
+  document.querySelectorAll("#sf-extra [data-xh]").forEach((el) => { const x = SF.extra[+el.dataset.xh]; if (x) head(el, x.serial, x.n); });
 }
 function sfStep(kind, i, d) {
   if (!Backend.canWrite) return;
@@ -1853,10 +1865,6 @@ function sfStep(kind, i, d) {
     if (d > 0) SF.qty = Math.min(999, SF.qty + 1);
     else if (main > 1) SF.qty--;
     else { const x = [...SF.extra].reverse().find((y) => y.n > 1); if (x) { x.n--; SF.qty--; } }
-  } else if (kind === "x") {
-    const x = SF.extra[i];
-    if (x && d > 0 && main > 1) x.n++;
-    else if (x && d < 0 && x.n > 1) x.n--;
   } else if (kind === "add") { if (main > 1) SF.extra.push({ n: 1, serial: "", loc: "", from: "", received: $("sf-received").value }); }
   else if (kind === "del") SF.extra.splice(i, 1);
   sfDraw();
@@ -3931,8 +3939,6 @@ document.addEventListener("click", (ev) => {
   if (t.id === "sf-saveadd") { saveStockForm(true); return; }
   const sq = t.closest("[data-sfq]");
   if (sq) { sfStep("qty", 0, +sq.dataset.sfq); return; }
-  const xq = t.closest("[data-xq]");
-  if (xq) { sfStep("x", +xq.dataset.x, +xq.dataset.xq); return; }
   const xd = t.closest("[data-xdel]");
   if (xd) { sfStep("del", +xd.dataset.xdel, 0); return; }
   if (t.id === "sf-addx") { sfStep("add", 0, 0); return; }
@@ -3984,6 +3990,7 @@ document.addEventListener("submit", (ev) => {
 });
 document.addEventListener("input", (ev) => {
   const t = ev.target;
+  if (t.id === "sf-serial" || t.dataset.xf === "serial") { sfKeep(); sfHeads(); return; }
   if (t.id === "sf-pn") {
     const val = t.value.trim();
     const exact = byPn.has(val.toUpperCase());
