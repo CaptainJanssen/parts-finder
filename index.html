@@ -549,6 +549,26 @@ table.occ tr:last-child td { border-bottom: 0; }
 .oadd { padding: 10px 14px; display: grid; gap: 6px; border-top: 1px solid var(--line); }
 .olines > .oadd:first-child { border-top: 0; }
 .olines > .oadd:first-child:not(:last-child) { border-bottom: 1px solid var(--line); }
+.oaddbtn { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px dashed var(--line); background: var(--surface-2); border-radius: 6px; padding: 9px 11px; font-size: 14.5px; color: var(--muted); cursor: pointer; }
+.oaddbtn svg { width: 16px; height: 16px; flex: none; }
+.oaddbtn:hover { border-color: var(--muted); color: var(--ink); }
+/* the window for adding parts to an order: search on top, the parts below */
+.picker .pksearch { padding: 12px 20px; border-bottom: 1px solid var(--line); flex: none; }
+.picker .pksearch .bigsearch { font-size: 16px; padding-block: 11px; }
+.picker .pklist { padding: 0; gap: 0; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
+.pkrow { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 11px 20px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; font-size: 14px; }
+.pkrow:hover { background: var(--surface-2); }
+.pk-pn { font-weight: 600; font-size: 14px; }
+.pk-desc .desc { display: block; font-size: 14px; }
+.pk-desc .ctx { display: block; margin-top: 3px; }
+.pk-n { min-width: 42px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; display: inline-grid; place-items: center; font-family: var(--f-mono); font-size: 14px; color: var(--muted); }
+.pk-n.on { color: var(--focus); font-weight: 700; border-color: color-mix(in srgb, var(--focus) 45%, transparent); background: color-mix(in srgb, var(--focus) 8%, var(--surface)); }
+.picker .empty { padding: 30px 20px; }
+@media (max-width: 760px) {
+  .pkrow { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "pn n" "desc n"; gap: 3px 10px; padding: 10px 14px; }
+  .pk-pn { grid-area: pn; } .pk-desc { grid-area: desc; } .pk-n { grid-area: n; }
+  .picker .pksearch { padding: 10px 14px; }
+}
 .olines .oline:last-of-type { border-bottom: 0; }
 .oadd input { border: 1px dashed var(--line); background: var(--surface-2); border-radius: 6px; padding: 9px 11px; font-size: 14.5px; color: var(--ink); width: 100%; }
 .oadd input:focus { border-style: solid; border-color: var(--focus); outline: none; background: var(--surface); }
@@ -888,6 +908,7 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
 <aside class="sheet" id="detail" hidden aria-label="Part details"></aside>
 <aside class="sheet" id="stocksheet" hidden aria-label="Stock item"></aside>
 <aside class="sheet" id="msgsheet" hidden aria-label="Export"></aside>
+<aside class="sheet picker" id="pickersheet" hidden aria-label="Add parts"></aside>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -1885,7 +1906,7 @@ function renderStock() {
 /* stock form */
 let SF = null; // {item, returnTo}
 // parts of the aircraft type chosen in the form (or the one picked on the start screen) come first
-function suggestions(text, ac) {
+function suggestions(text, ac, limit = 8) {
   const clauses = parseQuery(text);
   if (!clauses.length) return [];
   const out = [];
@@ -1898,7 +1919,7 @@ function suggestions(text, ac) {
   const other = (e) => (want && e.ac !== want ? 1 : 0);
   out.sort((a, b) => other(a[0]) - other(b[0]) || Math.min(a[1].group, 2) - Math.min(b[1].group, 2) || a[0].tier - b[0].tier || a[1].group - b[1].group || a[0].generic - b[0].generic || b[1].score - a[1].score);
   const seen = new Set(), res = [];
-  for (const [e] of out) { if (seen.has(e.p)) continue; seen.add(e.p); res.push(e); if (res.length === 8) break; }
+  for (const [e] of out) { if (seen.has(e.p)) continue; seen.add(e.p); res.push(e); if (res.length === limit) break; }
   return res;
 }
 // the asking price for a new unit: what the same part already in the warehouse is asked for, else the catalogue price
@@ -2421,7 +2442,7 @@ function openDetail(i) {
 }
 function closeSheets() {
   if (DV.open) { $("drawview").hidden = true; DV.open = false; }
-  ["detail", "stocksheet", "msgsheet", "scrim"].forEach((id) => { $(id).hidden = true; });
+  ["detail", "stocksheet", "msgsheet", "pickersheet", "scrim"].forEach((id) => { $(id).hidden = true; });
   S.sel = null; SF = null;
   document.querySelectorAll(".row.sel").forEach((r) => r.classList.remove("sel"));
   if (renderPending) { renderPending = false; render(); renderStock(); }
@@ -2624,7 +2645,7 @@ function orderDetail(o, ro) {
     '<label class="field">VAT<select data-of="vat" data-oid="' + id + '"' + dis + ">" + VAT_MODES().map(([k, v]) => '<option value="' + k + '"' + (o.vat === k ? " selected" : "") + ">" + esc(v) + "</option>").join("") + "</select></label>" +
     '<label class="field">Shipping (€)<input class="m" inputmode="decimal" data-oship="1" data-oid="' + id + '" value="' + esc(money(o.shipping)) + '" placeholder="0,00"' + dis + "></label></div>" +
     // "Add a part" sits above the parts of the order
-    '<div class="olines">' + (ro ? "" : '<div class="oadd"><input id="oadd-input" data-oadd="' + id + '" autocomplete="off" placeholder="Add a part"><div id="oadd-sugg"></div></div>') +
+    '<div class="olines">' + (ro ? "" : '<div class="oadd"><button class="oaddbtn" type="button" data-opicker="' + id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Add a part</button></div>') +
     (o.lines.length ? '<div class="olhdr" aria-hidden="true"><span>Part number</span><span>Description</span><span>Status</span><span>Qty</span><span class="r">€ each</span><span class="r">Total</span><span></span></div>' + lines : "") +
     (o.lines.length ? ototalHtml(o) : "") + "</div>" +
     '<label class="field onotes">Notes<textarea rows="2" data-of="notes" data-oid="' + id + '"' + dis + ">" + esc(o.notes) + "</textarea></label>" +
@@ -2758,17 +2779,84 @@ function detailOrderHtml(e) {
     '<div class="listactions"><select id="d-ord" aria-label="Customer order">' + open.map((o) => '<option value="' + esc(o.id) + '">' + esc(o.no + (o.customer ? " · " + o.customer : "")) + "</option>").join("") + '<option value="new">New order…</option></select>' +
     '<button class="btn" type="button" data-dorder="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '">Add to order</button></div></div>';
 }
-// part suggestions while typing in "Add a part"; the search waits for a short pause in the typing
-let oSugTimer = null;
-function orderSuggest(t) { clearTimeout(oSugTimer); oSugTimer = setTimeout(() => orderSuggestNow(t), 90); }
-function orderSuggestNow(t) {
-  clearTimeout(oSugTimer);
-  const val = t.value.trim();
-  const box = $("oadd-sugg");
+/* "Add a part" in an order: a window of its own with a search box and the parts to scroll through (like the catalogue);
+   a tap adds one to the order, the number on the right shows how many the order has */
+const PK = { oid: null, list: [], shown: 0, timer: 0 };
+function openPicker(oid) {
+  const o = orders.get(oid);
+  if (!o || !ordersReady()) return;
+  PK.oid = oid;
+  const sh = $("pickersheet");
+  sh.innerHTML = '<header><div style="min-width:0"><div class="eyebrow" id="pk-head"></div><div class="bigdesc" style="font-size:20px;margin-top:2px">Add parts</div></div><button class="btn primary" type="button" data-pkdone>Done</button></header>' +
+    '<div class="pksearch"><div class="searchbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>' +
+    '<input id="pk-q" class="bigsearch" type="search" autocomplete="off" spellcheck="false" placeholder="Part number or name" aria-label="Search parts"><button id="pk-clear" class="clearq" type="button" aria-label="Clear the search" hidden>×</button></div></div>' +
+    '<div class="body pklist" id="pk-list"></div>';
+  ["detail", "stocksheet", "msgsheet"].forEach((id) => { $(id).hidden = true; });
+  sh.hidden = false; $("scrim").hidden = false;
+  const list = $("pk-list");
+  list.addEventListener("scroll", () => pkMore(), { passive: true });
+  // scrolling through the parts puts the keyboard away, so the whole list is in view
+  list.addEventListener("touchmove", () => { if (document.activeElement === $("pk-q")) $("pk-q").blur(); }, { passive: true });
+  pkHead();
+  pkSearch();
+  $("pk-q").focus({ preventScroll: true });
+}
+function pkHead() {
+  const o = orders.get(PK.oid);
+  if (!o || !$("pk-head")) return;
+  const n = orderUnits(o);
+  $("pk-head").textContent = orderLabel(o) + (o.customer ? " · " + o.customer : "") + " · " + n + (n === 1 ? " part" : " parts");
+}
+// no search: the parts of the aircraft picked in the catalogue, complete units first (no hardware); otherwise the best matches
+function pkFind(text) {
+  if (!parseQuery(text).length) return DEFAULT_ORDER.map((i) => P[i]).filter((e) => (!S.ac || e.ac === S.ac) && e.c !== "hw");
+  return suggestions(text, "", 400);
+}
+function pkCount(pn) {
+  const o = orders.get(PK.oid);
+  const n = o ? o.lines.filter((l) => l.pn === pn).reduce((s, l) => s + l.qty, 0) : 0;
+  return '<span class="pk-n' + (n ? " on" : "") + '">' + (n ? "× " + n : "+") + "</span>";
+}
+function pkRow(e) {
+  return '<button class="pkrow" type="button" data-pk="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '"><span class="pk-pn mono">' + esc(e.p) + "</span>" +
+    '<span class="pk-desc"><span class="desc">' + esc(e.d) + '</span><span class="ctx"><span class="tag ac">' + esc(acShort(e.ac)) + "</span>" + (e.tier === 1 ? '<span class="tag unit">Complete unit</span>' : "") +
+    (inStock(e.p) ? '<span class="tag instock">' + inStock(e.p) + " in stock</span>" : "") + "</span></span>" + pkCount(e.p) + "</button>";
+}
+function pkSearch() {
+  const q = $("pk-q").value;
+  $("pk-clear").hidden = !q;
+  PK.list = pkFind(q);
+  PK.shown = 0;
+  const box = $("pk-list");
+  // a part number that is not in the catalogue can be added too (it has a digit, and no catalogue part starts with it)
+  const raw = q.trim().toUpperCase().replace(/\s+/g, "-");
+  const own = /^(?=.*\d)[A-Z0-9][A-Z0-9-]{3,39}$/.test(raw) && !byPn.has(raw) && !PK.list.some((e) => e.p.startsWith(raw))
+    ? '<button class="pkrow" type="button" data-pk="' + esc(raw) + '" data-ac=""><span class="pk-pn mono">' + esc(raw) + '</span><span class="pk-desc"><span class="muted">Not in the IPC catalogue · add it anyway</span></span>' + pkCount(raw) + "</button>" : "";
+  box.innerHTML = own || PK.list.length ? own : '<div class="empty"><h3>No parts found</h3></div>';
+  box.scrollTop = 0;
+  pkMore(true);
+}
+// the list grows while you scroll
+function pkMore(force) {
+  const box = $("pk-list");
   if (!box) return;
-  const sug = val.length >= 2 ? suggestions(val, "") : [];
-  box.innerHTML = sug.length ? '<div class="sugg">' + sug.map((e) => '<button type="button" data-opick="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '" data-oid="' + esc(t.dataset.oadd) + '"><span class="mono">' + esc(e.p) + "</span><span>" + esc(e.d) + ' <span class="tag ac">' + esc(acShort(e.ac)) + "</span>" + (inStock(e.p) ? ' <span class="tag instock">' + inStock(e.p) + " in stock</span>" : "") + "</span></button>").join("") + "</div>"
-    : val.length >= 3 ? '<span class="pnwarn">Not in the IPC catalogue · Enter to add</span>' : "";
+  for (let i = 0; i < 6 && PK.shown < PK.list.length; i++) {
+    if (!force && box.scrollTop + box.clientHeight < box.scrollHeight - 700) return;
+    const next = PK.list.slice(PK.shown, PK.shown + 60);
+    PK.shown += next.length;
+    box.insertAdjacentHTML("beforeend", next.map(pkRow).join(""));
+    force = false;
+  }
+}
+function pkAdd(b) {
+  const o = orders.get(PK.oid);
+  if (!o || !ordersReady()) return;
+  const pn = b.dataset.pk;
+  addLine(o, pn, b.dataset.ac, 1);
+  document.querySelectorAll('#pk-list [data-pk="' + CSS.escape(pn) + '"] .pk-n').forEach((el) => { el.outerHTML = pkCount(pn); });
+  pkHead();
+  renderOrders();
+  toast("Added " + pn);
 }
 // "Add a part" on the To dismantler tab: the part goes on the list for stock
 let dSugTimer = null;
@@ -2798,7 +2886,6 @@ function orderPick(oid, pn, ac) {
   if (!o || !ordersReady()) return;
   addLine(o, pn, ac, 1);
   renderOrders();
-  $("oadd-input")?.focus({ preventScroll: true });
   toast("Added " + pn + " to " + orderLabel(o));
 }
 function orderClick(t) {
@@ -2822,7 +2909,6 @@ function orderClick(t) {
     if (L.addAfter) { o = addLine(o, L.addAfter.pn, L.addAfter.ac, L.addAfter.q || 1); L.addAfter = null; }   // the part picked with "+ Add" in the catalogue
     L.creating = false; L.open = o.id; L.q = ""; $("oq").value = ""; $("clearoq").hidden = true;
     renderOrders(); scrollToOpenOrder();
-    $("oadd-input")?.focus({ preventScroll: true });
     toast(orderLabel(o) + " created");
     return true;
   }
@@ -4208,12 +4294,18 @@ document.addEventListener("keydown", (ev) => {
     return;
   }
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.id === "d-drawbox") { ev.preventDefault(); dvOpen(); return; }
-  if (ev.key === "Escape" && ["detail", "stocksheet", "msgsheet"].some((id) => !$(id).hidden)) closeSheets();
+  if (ev.key === "Escape" && ["detail", "stocksheet", "msgsheet", "pickersheet"].some((id) => !$(id).hidden)) closeSheets();
   else if (ev.key === "Escape" && S.view === "pick" && S.ac != null) setView("parts");
 });
 
 document.addEventListener("click", (ev) => {
   const t = ev.target;
+  const opk = t.closest("[data-opicker]");
+  if (opk) { openPicker(opk.dataset.opicker); return; }
+  const pkb = t.closest("#pk-list [data-pk]");
+  if (pkb) { pkAdd(pkb); return; }
+  if (t.closest("[data-pkdone]")) { closeSheets(); return; }
+  if (t.closest("#pk-clear")) { $("pk-q").value = ""; pkSearch(); $("pk-q").focus({ preventScroll: true }); return; }
   const amb = t.closest("[data-addmenu]");
   if (amb) { openAddMenu(amb); return; }
   const rqb = t.closest("[data-rq]");
@@ -4325,7 +4417,7 @@ document.addEventListener("input", (ev) => {
     $("sf-sugg").innerHTML = sug.length ? '<div class="sugg">' + sug.map((e) => '<button type="button" data-pick="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '"><span class="mono">' + esc(e.p) + "</span><span>" + esc(e.d) + (e.tier === 1 ? ' <span class="tag unit">Complete unit</span>' : "") + ((want || S.ac) && e.ac !== (want || S.ac) || !(want || S.ac) ? ' <span class="tag ac">' + esc(acShort(e.ac)) + "</span>" : "") + "</span></button>").join("") + "</div>" : (val.length >= 3 ? '<span class="pnwarn">Not in the IPC catalogue</span>' : "");
   }
   if (t.id === "sf-status") $("sf-soldbox").hidden = t.value !== "sold";
-  if (t.id === "oadd-input") orderSuggest(t);
+  if (t.id === "pk-q") { clearTimeout(PK.timer); PK.timer = setTimeout(pkSearch, 120); }
   if (t.id === "dadd") dismSuggest();
 });
 document.addEventListener("change", (ev) => {
@@ -4354,7 +4446,8 @@ document.addEventListener("keydown", (ev) => {
     if (first) dismAdd(first.dataset.dpick); else if (/^[A-Z0-9][A-Z0-9-]{2,39}$/i.test(t.value.trim())) dismAdd(t.value.trim().toUpperCase());
     return;
   }
-  if (ev.key === "Enter" && t.id === "oadd-input") { ev.preventDefault(); orderSuggestNow(t); const first = document.querySelector("#oadd-sugg [data-opick]"); if (first) first.click(); else if (/^[A-Z0-9][A-Z0-9-]{2,39}$/i.test(t.value.trim())) orderPick(t.dataset.oadd, t.value.trim().toUpperCase(), ""); return; }
+  // Enter in the parts window adds the top part; the text stays selected, so the next part number can be typed over it
+  if (ev.key === "Enter" && t.id === "pk-q") { ev.preventDefault(); clearTimeout(PK.timer); pkSearch(); const first = document.querySelector("#pk-list [data-pk]"); if (first) { pkAdd(first); t.select(); } return; }
   if (ev.key === "Enter" && ["on-customer", "on-ref", "on-contact", "on-email"].includes(t.id)) { ev.preventDefault(); document.querySelector("[data-ocreate]")?.click(); return; }
   if (ev.key === "Enter" && t.id === "sf-pn") { const first = document.querySelector("#sf-sugg [data-pick]"); if (first) { ev.preventDefault(); pickSuggestion(first.dataset.pick, first.dataset.ac); } }
 });
