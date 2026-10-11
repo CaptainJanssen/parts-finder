@@ -619,6 +619,9 @@ table.occ tr:last-child td { border-bottom: 0; }
 table.sales td.r, table.sales th.r { text-align: right; }
 table.sales tfoot td { font-weight: 600; background: var(--surface-2); border-top: 1px solid var(--line); }
 .countpop .cprow { display: flex; gap: 8px; align-items: center; padding: 4px 4px 2px; }
+/* stock form: "last" price next to Bought for and Asking price */
+.flab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.lasth { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .countpop .qty.big { flex: 1; }
 .tab .lamp.on { margin-left: 2px; }
 /* tablets (an iPad upright): the order lines keep their columns, the stock and request status goes under the description */
@@ -1880,6 +1883,35 @@ function suggestions(text, ac) {
   for (const [e] of out) { if (seen.has(e.p)) continue; seen.add(e.p); res.push(e); if (res.length === 8) break; }
   return res;
 }
+// the asking price for a new unit: what the same part already in the warehouse is asked for, else the catalogue price
+function askingFor(pn) {
+  let best = null;
+  for (const it of stock.values()) {
+    if (it.pn !== pn || it.sell == null || (it.status !== "stock" && it.status !== "reserved")) continue;
+    if (!best || (it.updated || "") > (best.updated || "")) best = it;
+  }
+  return best ? best.sell : rec(pn).sell ?? null;
+}
+// next to Bought for and Asking price: what the last one sold was bought and sold for
+function sfHints() {
+  const pn = ($("sf-pn") ? $("sf-pn").value : "").trim().toUpperCase().replace(/\s+/g, "-");
+  const hist = soldByPn.get(pn);
+  for (const [id, f] of [["sf-buyh", "buy"], ["sf-sellh", "soldPrice"]]) {
+    const el = $(id);
+    if (!el) continue;
+    const x = hist && hist.find((it) => it[f] != null);
+    el.textContent = x ? "last " + EUR.format(x[f]) : "";
+    el.title = x ? (f === "buy" ? "Bought for " : "Sold for ") + EUR.format(x[f]) + (x.soldDate ? ", sold " + dateNl(x.soldDate) : "") : "";
+  }
+}
+// a part number chosen in the form: fill in the prices that are still empty
+function sfPricesFor(pn) {
+  if (!pn) return;
+  const r = rec(pn), ask = askingFor(pn);
+  if ($("sf-buy") && !$("sf-buy").value && r.buy != null) $("sf-buy").value = money(r.buy);
+  if ($("sf-sell") && !$("sf-sell").value && ask != null) $("sf-sell").value = money(ask);
+  sfHints();
+}
 function openStockForm(item, returnTo) {
   const isNew = !item || !item.id;
   const base = normStock({ id: isNew ? newId() : item.id, qty: 1, cond: "AR", status: "stock", received: today(), ...(item || {}) });
@@ -1887,10 +1919,10 @@ function openStockForm(item, returnTo) {
     const r = rec(base.pn);
     const e = entryOf(base.pn, base.ac);
     if (base.buy == null && r.buy != null) base.buy = r.buy;
-    if (base.sell == null && r.sell != null) base.sell = r.sell;
     if (!base.desc) base.desc = e.d;
     if (!base.ac) base.ac = e.ac;
   }
+  if (isNew && base.pn && base.sell == null) base.sell = askingFor(base.pn);
   if (isNew && !base.ac && S.ac) base.ac = S.ac;
   const isDraft = base.status === "draft";
   // booking in: parts for a customer order are reserved for that customer, the rest go into stock
@@ -1930,8 +1962,8 @@ function renderStockForm() {
     '<label class="field" for="sf-received">Date received<input id="sf-received" type="date" value="' + esc(it.received) + '"' + ro + "></label>" +
     '</div></div><div id="sf-extra"></div>' + (Backend.canWrite ? '<button class="btn" type="button" id="sf-addx" hidden>+ Add entry</button>' : "") + "</div>" +
     '<div class="sec"><h4>Price per unit</h4><div class="formgrid">' +
-    '<label class="field" for="sf-buy">Bought for (€)<input id="sf-buy" class="m" inputmode="decimal" value="' + esc(money(it.buy)) + '" placeholder="0,00"' + ro + "></label>" +
-    '<label class="field" for="sf-sell">Asking price (€)<input id="sf-sell" class="m" inputmode="decimal" value="' + esc(money(it.sell)) + '" placeholder="0,00"' + ro + "></label>" +
+    '<label class="field" for="sf-buy"><span class="flab"><span>Bought for (€)</span><span class="lasth" id="sf-buyh"></span></span><input id="sf-buy" class="m" inputmode="decimal" value="' + esc(money(it.buy)) + '" placeholder="0,00"' + ro + "></label>" +
+    '<label class="field" for="sf-sell"><span class="flab"><span>Asking price (€)</span><span class="lasth" id="sf-sellh"></span></span><input id="sf-sell" class="m" inputmode="decimal" value="' + esc(money(it.sell)) + '" placeholder="0,00"' + ro + "></label>" +
     '<div class="full" id="sf-soldbox"' + (it.status === "sold" ? "" : " hidden") + '><div class="formgrid">' +
     '<label class="field" for="sf-soldprice">Sold for (€ per unit)<input id="sf-soldprice" class="m" inputmode="decimal" value="' + esc(money(it.soldPrice)) + '" placeholder="0,00"' + ro + "></label>" +
     '<label class="field" for="sf-solddate">Date sold<input id="sf-solddate" type="date" value="' + esc(it.soldDate) + '"' + ro + "></label>" +
@@ -1943,6 +1975,7 @@ function renderStockForm() {
     '<button class="btn" type="button" data-close>Cancel</button><span class="spacer"></span>' +
     (!SF.isNew && Backend.canWrite ? '<button class="btn danger" type="button" id="sf-delete">' + (SF.isDraft ? "Discard" : "Delete") + "</button>" : "") + "</div></form>";
   sfDraw();
+  sfHints();
 }
 // Quantity counter (− and +), and extra entries when part of a batch sits elsewhere or came from another aircraft.
 // The first location takes the units the extra entries leave; each entry is saved as its own stock item.
@@ -2047,9 +2080,7 @@ function pickSuggestion(pn, ac) {
   $("sf-pn").value = pn;
   $("sf-desc").value = e.d;
   $("sf-ac").value = e.ac;
-  const r = rec(pn);
-  if (!$("sf-buy").value && r.buy != null) $("sf-buy").value = money(r.buy);
-  if (!$("sf-sell").value && r.sell != null) $("sf-sell").value = money(r.sell);
+  sfPricesFor(pn);
   $("sf-sugg").innerHTML = "";
   $("sf-pninfo").innerHTML = '<span class="pnok">✓ In the IPC catalogue (' + esc(acsOf(pn).map(acShort).join(", ")) + ")</span>";
   $("sf-pn").blur();   // the keyboard closes, so the quantity counter is in view
@@ -2670,7 +2701,7 @@ function makeDraft(x, o) {
   const r = rec(x.pn);
   const line = o ? o.lines.find((l) => l.pn === x.pn) : null;
   putStock({ id: newId(), pn: x.pn, desc: x.desc || (e ? e.d : ""), ac: x.ac || (e ? e.ac : ""), qty: x.qty || 1, status: "draft", cond: "AR",
-    received: today(), buy: r.buy ?? null, sell: (line && line.sell != null ? line.sell : r.sell) ?? null,
+    received: today(), buy: r.buy ?? null, sell: line && line.sell != null ? line.sell : askingFor(x.pn),
     customer: o ? o.customer : "", order: o ? o.no : "" });
 }
 function dismRows(key, only) {
@@ -3523,7 +3554,7 @@ function scanAdd(lab) {
     const e = entryOf(lab.pn, W.ac || S.ac);
     const r = rec(lab.pn);
     const it = putStock({ id: newId(), pn: lab.pn, desc: e ? e.d : "", ac: e ? e.ac : (W.ac || S.ac || ""), qty: 1, status: "draft", cond: "AR",
-      received: today(), serial: lab.sn || "", buy: r.buy ?? null, sell: r.sell ?? null });
+      received: today(), serial: lab.sn || "", buy: r.buy ?? null, sell: askingFor(lab.pn) });
     SC.rows.unshift({ key, id: it.id, pn: lab.pn, sn: lab.sn || "", qty: 1, known: lab.known });
   }
   SC.ask = SC.ask.filter((a) => a.pn !== lab.pn);
@@ -3989,7 +4020,7 @@ function addMenuPick(b) {
     const e = entryOf(pn, ac), r = rec(pn);
     const wait = [...stock.values()].find((s) => s.status === "draft" && s.pn === pn && !s.order);
     if (wait) putStock({ ...wait, qty: wait.qty + q });
-    else putStock({ id: newId(), pn, desc: e ? e.d : "", ac: e ? e.ac : ac, qty: q, status: "draft", cond: "AR", received: today(), buy: r.buy ?? null, sell: r.sell ?? null });
+    else putStock({ id: newId(), pn, desc: e ? e.d : "", ac: e ? e.ac : ac, qty: q, status: "draft", cond: "AR", received: today(), buy: r.buy ?? null, sell: askingFor(pn) });
     rqSet(pn, 1);
     renderStock(); render();
     toast(what + " added to To book in");
@@ -4252,8 +4283,9 @@ document.addEventListener("input", (ev) => {
   if (t.id === "sf-pn") {
     const val = t.value.trim();
     const exact = byPn.has(val.toUpperCase());
+    sfHints();
     $("sf-pninfo").innerHTML = !val ? "" : exact ? '<span class="pnok">✓ In the IPC catalogue (' + esc(acsOf(val.toUpperCase()).map(acShort).join(", ")) + ")</span>" : "";
-    if (exact) { const e = entryOf(val.toUpperCase(), $("sf-ac").value); if (!$("sf-desc").value) $("sf-desc").value = e.d; if (!$("sf-ac").value) $("sf-ac").value = e.ac; $("sf-sugg").innerHTML = ""; return; }
+    if (exact) { const e = entryOf(val.toUpperCase(), $("sf-ac").value); if (!$("sf-desc").value) $("sf-desc").value = e.d; if (!$("sf-ac").value) $("sf-ac").value = e.ac; $("sf-sugg").innerHTML = ""; sfPricesFor(val.toUpperCase()); return; }
     const want = $("sf-ac").value;
     const sug = val.length >= 2 ? suggestions(val, want) : [];
     $("sf-sugg").innerHTML = sug.length ? '<div class="sugg">' + sug.map((e) => '<button type="button" data-pick="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '"><span class="mono">' + esc(e.p) + "</span><span>" + esc(e.d) + (e.tier === 1 ? ' <span class="tag unit">Complete unit</span>' : "") + ((want || S.ac) && e.ac !== (want || S.ac) || !(want || S.ac) ? ' <span class="tag ac">' + esc(acShort(e.ac)) + "</span>" : "") + "</span></button>").join("") + "</div>" : (val.length >= 3 ? '<span class="pnwarn">Not in the IPC catalogue</span>' : "");
@@ -4266,6 +4298,7 @@ document.addEventListener("change", (ev) => {
   const t = ev.target;
   if (t.classList && t.classList.contains("stsel")) { stockStatus(t); return; }
   if (t.id === "sf-status") { $("sf-soldbox").hidden = t.value !== "sold"; if (t.value === "sold" && !$("sf-solddate").value) $("sf-solddate").value = today(); return; }
+  if (t.id === "sf-pn") { if (SF && SF.isNew) sfPricesFor(t.value.trim().toUpperCase().replace(/\s+/g, "-")); return; }   // also part numbers that are not in the catalogue
   if (t.id && t.id.startsWith("sf-")) return;
   if (t.id === "co-logofile") { loadLogo(t.files && t.files[0]); return; }
   if (t.id === "sc-photo") { scanPhoto(t.files && t.files[0]); t.value = ""; return; }
