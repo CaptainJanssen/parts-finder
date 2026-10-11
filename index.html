@@ -264,6 +264,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* Warehouse */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; padding-block: 20px 6px; }
+#tiles { grid-template-columns: minmax(160px, 260px); }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
 .tile .k { font-family: var(--f-display); text-transform: uppercase; letter-spacing: .12em; font-size: 11px; color: var(--muted); }
 .tile .v { font-family: var(--f-mono); font-size: 21px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -1690,16 +1691,7 @@ function renderStock() {
   const active = all.filter((it) => it.status !== "sold");
   renderDrafts();
   const units = active.reduce((s, it) => s + it.qty, 0);
-  const pns = new Set(active.map((it) => it.pn)).size;
-  const cost = active.reduce((s, it) => s + (it.buy ?? 0) * it.qty, 0);
-  const ask = active.reduce((s, it) => s + (it.sell ?? 0) * it.qty, 0);
-  const noAsk = active.filter((it) => it.sell == null).length;
-  const reserved = active.filter((it) => it.status === "reserved").reduce((s, it) => s + it.qty, 0);
-  $("tiles").innerHTML =
-    '<div class="tile"><div class="k">Units on the shelf</div><div class="v">' + units + '</div></div>' +
-    '<div class="tile"><div class="k">Value at cost</div><div class="v">' + esc(EUR0.format(cost)) + '</div></div>' +
-    '<div class="tile"><div class="k">Value at asking price</div><div class="v">' + esc(EUR0.format(ask)) + '</div></div>' +
-    '<div class="tile"><div class="k">Potential margin</div><div class="v ' + (ask - cost >= 0 ? "pos" : "neg") + '">' + esc(EUR0.format(ask - cost)) + '</div></div>';
+  $("tiles").innerHTML = '<div class="tile"><div class="k">Units on the shelf</div><div class="v">' + units + "</div></div>";
   // filter options
   const locs = [...new Set(all.map((it) => it.loc).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
   $("sac").innerHTML = '<option value="">Any</option>' + AC_OPTIONS.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === W.ac ? " selected" : "") + ">" + esc(l) + "</option>").join("");
