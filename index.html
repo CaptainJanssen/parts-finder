@@ -853,7 +853,7 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
         <button type="button" role="tab" data-ltab="dism" aria-selected="false">To dismantler <span class="lamp" id="on-dism">0</span></button>
       </div>
       <span class="spacer"></span>
-      <button class="btn rwonly" type="button" data-company>Company details</button>
+      <button class="btn rwonly" type="button" data-company id="ocompany">Company details</button>
       <span class="seg" id="ofilt" role="group" aria-label="Show"><button type="button" data-ofilter="open" aria-pressed="true">Open</button><button type="button" data-ofilter="all" aria-pressed="false" id="ofilter-all">All</button></span>
     </div>
     <div class="searchzone" id="obar-orders" style="padding-top:12px">
@@ -2519,6 +2519,7 @@ function renderOrders() {
   $("obar-dism").hidden = L.tab !== "dism";
   const ro = !Backend.canWrite;
   document.querySelectorAll("#view-orders .rwonly").forEach((el) => { el.hidden = ro; });
+  $("ocompany").hidden = ro || L.tab !== "orders";   // Company details: only with the customer orders
   const todoN = dismGroups("todo").length;
   // the To dismantler buttons work on the parts you picked (Export and Copy on everything when nothing is picked)
   const todoKeys = new Set(dismGroups("todo").flatMap((g) => g.items.map((x) => x.k)));
