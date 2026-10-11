@@ -1625,11 +1625,14 @@ function rowHtml(e) {
   const mg = margin(r);
   const ro = !Backend.canWrite ? " readonly" : "";
   const mgHtml = mg ? '<span class="' + (mg.m >= 0 ? "pos" : "neg") + '">' + esc(EUR.format(mg.m)) + "</span><small>" + (mg.pct == null ? "" : esc(mg.pct.toFixed(0)) + "%") + "</small>" : '<span style="color:var(--muted)">–</span>';
+  // the "last" line under Buy and Sell: when only one of them has a price, the other keeps an empty line so both boxes stay level
+  let hb = lastSale(e.p, "buy"), hs = lastSale(e.p, "soldPrice");
+  if (hb || hs) { const gap = '<small class="hist" aria-hidden="true">&nbsp;</small>'; hb = hb || gap; hs = hs || gap; }
   return '<div class="row' + (S.sel === e.idx ? " sel" : "") + '" data-i="' + e.idx + '">' +
     '<div class="c-pn"><span class="pn">' + esc(e.p) + '</span><button class="copy" type="button" data-copy="' + esc(e.p) + '" aria-label="Copy ' + esc(e.p) + '" title="Copy part number">' + COPY_SVG + "</button></div>" +
     '<div class="c-desc"><div class="desc">' + esc(e.d) + "</div>" + fitsHtml(e) + '<div class="ctx">' + ctxLine(e) + "</div></div>" +
-    '<div class="c-buy"><input class="price" inputmode="decimal" data-f="buy" data-pn="' + esc(e.p) + '" value="' + esc(money(r.buy)) + '" placeholder="0,00" aria-label="Buy price for ' + esc(e.p) + '"' + ro + ">" + lastSale(e.p, "buy") + "</div>" +
-    '<div class="c-sell"><input class="price" inputmode="decimal" data-f="sell" data-pn="' + esc(e.p) + '" value="' + esc(money(r.sell)) + '" placeholder="0,00" aria-label="Sell price for ' + esc(e.p) + '"' + ro + ">" + lastSale(e.p, "soldPrice") + "</div>" +
+    '<div class="c-buy"><input class="price" inputmode="decimal" data-f="buy" data-pn="' + esc(e.p) + '" value="' + esc(money(r.buy)) + '" placeholder="0,00" aria-label="Buy price for ' + esc(e.p) + '"' + ro + ">" + hb + "</div>" +
+    '<div class="c-sell"><input class="price" inputmode="decimal" data-f="sell" data-pn="' + esc(e.p) + '" value="' + esc(money(r.sell)) + '" placeholder="0,00" aria-label="Sell price for ' + esc(e.p) + '"' + ro + ">" + hs + "</div>" +
     '<div class="c-margin">' + mgHtml + "</div>" +
     '<div class="c-act">' + rqHtml(e.p) + '<button class="addlist' + (r.listed ? " on" : "") + '" type="button" data-addmenu="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '" aria-haspopup="menu"' + (Backend.canWrite ? "" : " disabled") + ">" + (r.listed ? "✓ Listed" : "+ Add") + "</button></div></div>";
 }
@@ -2011,6 +2014,7 @@ function saveStockForm(addAnother) {
     if (Number.isNaN(it[f])) { toast("Enter a price like 125 or 125,50."); $(id).focus(); return; }
   }
   if (it.status === "sold" && !it.soldDate) it.soldDate = today();
+  if (it.status === "sold" && it.soldPrice == null && it.sell != null) it.soldPrice = it.sell;   // like the status dropdown: the asking price until you fill in the real one
   if (byPn.has(it.pn)) { const e = entryOf(it.pn, it.ac); if (!it.desc) it.desc = e.d; if (!it.ac) it.ac = e.ac; }
   // extra entries become their own stock items; entries with the same serial, location and aircraft are joined
   sfKeep();
