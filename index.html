@@ -362,6 +362,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .scqty span { min-width: 26px; text-align: center; font-weight: 600; }
 .scchoices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .scchoice { font-family: var(--f-mono); font-size: 13.5px; font-weight: 600; text-align: left; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 6px; padding: 5px 9px; cursor: pointer; max-width: 100%; }
+.scchoice.best { border-color: var(--focus); background: color-mix(in srgb, var(--focus) 10%, var(--surface)); }
+.scread { position: absolute; left: 50%; bottom: 54px; transform: translateX(-50%); border: 2px solid #fff; background: rgba(0, 0, 0, .45); color: #fff; border-radius: 999px; padding: 10px 22px; font-size: 15px; font-weight: 600; cursor: pointer; backdrop-filter: blur(4px); }
+.scread:disabled { opacity: .7; }
+.scstage.nocam .scread { display: none; }
 .scchoice small { display: block; font-family: var(--f-body); font-weight: 400; font-size: 11.5px; color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scempty { color: var(--muted); font-size: 14px; margin: 10px 0; }
 @media (min-width: 700px) and (orientation: landscape) {
@@ -3202,9 +3206,36 @@ function nearPns(word) {
   for (const [key, pns] of skelIndex()) if (within1(key, k)) { out.push(...pns); if (out.length >= 6) break; }
   return out.slice(0, 6);
 }
+function prefixPns(base) {
+  const k = skel(base), out = [];
+  for (const pn of byPn.keys()) {
+    if (pn.startsWith(base + "-") || (skel(pn).startsWith(k) && skel(pn).length > k.length && skel(pn).length <= k.length + 4)) { out.push(pn); if (out.length >= 60) break; }
+  }
+  return out;
+}
+const DESC_SKIP = new Set(["ASSY", "AND", "THE", "FOR", "WITH", "INSTL", "PANEL", "BOEING", "AIRBUS"]);
+function rankPns(list, text, read) {
+  const words = text.split(/[^A-Z0-9]+/).filter((w) => w.length >= 3 && /[A-Z]/.test(w) && !DESC_SKIP.has(w));
+  const shorts = new Set(text.split(/[^A-Z0-9]+/).filter((w) => w.length >= 1 && w.length <= 4).map(skel));
+  const m = /-([A-Z0-9]{1,6})$/.exec(read || "");
+  const dashRead = m ? skel(m[1]) : "";
+  const score = (pn) => {
+    let sc = 0;
+    const d = (entryOf(pn, W.ac || S.ac) || {}).d || "";
+    for (const dw of new Set(d.toUpperCase().split(/[^A-Z0-9]+/).filter((w) => w.length >= 3 && !DESC_SKIP.has(w)))) {
+      if (words.some((w) => w === dw)) sc += 3;
+      else if (words.some((w) => (w.startsWith(dw) || dw.startsWith(w)) && Math.min(w.length, dw.length) >= 3)) sc += 2;
+    }
+    const dn = /-([A-Z0-9]{1,6})$/.exec(pn);
+    if (dn && (skel(dn[1]) === dashRead || shorts.has(skel(dn[1])))) sc += 10;
+    return sc;
+  };
+  return list.map((pn) => [pn, score(pn)]).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "en", { numeric: true })).slice(0, 6).map((x) => x[0]);
+}
 // what a label says: { pn, sn, known, tagged, choices }
 function parseLabel(raw, fuzzy) {
-  const t = String(raw || "").replace(/[\x00-\x1f]/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+  const t = String(raw || "").replace(/[\x00-\x1f]/g, " ").replace(/\s+/g, " ").trim().toUpperCase()
+    .replace(/([A-Z0-9])-\s+([A-Z0-9]{1,6})(?=\s|$)/g, "$1-$2");    // "P/N 69-37320-" with the dash number stamped in a box next to it
   if (!t) return {};
   let pn = "", sn = "", tagged = false;
   const iso = /^\[\)>/.test(t);                              // ISO 15434 (data identifiers 1P = part number, S = serial)
@@ -3224,7 +3255,14 @@ function parseLabel(raw, fuzzy) {
     for (const w of tries) {
       const c = nearPns(w);
       if (c.length === 1 && skel(c[0]) === skel(w)) return { pn: c[0], sn, known: true, tagged, read: w };
-      if (c.length) return { pn: w, sn, known: false, tagged: true, choices: c };
+      if (c.length) return { pn: w, sn, known: false, tagged: true, choices: rankPns(c, t, w) };
+    }
+    // only the start of the number was read (a stamped dash number often isn't): the catalogue parts that start with it,
+    // the ones whose description matches the words on the plate first
+    const base = (pn || tries.find((w) => /\d-/.test(w)) || "").replace(/-[^-]*$/, "");
+    if (skel(base).length >= 5) {
+      const c = prefixPns(base);
+      if (c.length) return { pn: pn || base + "-", sn, known: false, tagged: true, choices: rankPns(c, t, pn) };
     }
   }
   if (pn) return { pn, sn, known: false, tagged: true };
@@ -3309,8 +3347,8 @@ function scanList() {
   if (!el) return;
   SC.rows = SC.rows.filter((r) => stock.has(r.id));
   const ask = SC.ask.map((a, i) => '<div class="scrow ask"><div class="scpn"><span class="pn">' + esc(a.pn) + '</span><span class="ctx">' + (a.choices ? "Which part?" : "Not in the catalogue") + (a.sn ? " · S/N " + esc(a.sn) : "") + "</span>" +
-    (a.choices ? '<div class="scchoices">' + a.choices.map((c, j) => { const e = entryOf(c, W.ac || S.ac); return '<button class="scchoice" type="button" data-scpick="' + i + ":" + j + '">' + esc(c) + (e ? "<small>" + esc(e.d) + "</small>" : "") + "</button>"; }).join("") + "</div>" : "") +
-    '</div><button class="btn small" type="button" data-scask="' + i + '">' + (a.choices ? "As read" : "Add") + '</button><button class="xbtn" type="button" data-scnot="' + i + '" aria-label="Ignore">×</button></div>').join("");
+    (a.choices ? '<div class="scchoices">' + a.choices.map((c, j) => { const e = entryOf(c, W.ac || S.ac); return '<button class="scchoice' + (j === 0 ? " best" : "") + '" type="button" data-scpick="' + i + ":" + j + '">' + esc(c) + (e ? "<small>" + esc(e.d) + "</small>" : "") + "</button>"; }).join("") + "</div>" : "") +
+    "</div>" + (a.choices && /-$/.test(a.pn) ? "" : '<button class="btn small" type="button" data-scask="' + i + '">' + (a.choices ? "As read" : "Add") + "</button>") + '<button class="xbtn" type="button" data-scnot="' + i + '" aria-label="Ignore">×</button></div>').join("");
   const rows = SC.rows.map((r) => {
     const it = stock.get(r.id);
     return '<div class="scrow"><div class="scpn"><span class="pn">' + esc(r.pn) + "</span>" +
@@ -3322,6 +3360,76 @@ function scanList() {
   el.innerHTML = (ask || rows) ? ask + rows : '<p class="scempty">Point the camera at the barcode on the label.</p>';
   const c = $("sc-count");
   if (c) c.textContent = n ? n + " to book in" : "";
+}
+
+// Read text: the words on a data plate, read on this device (Tesseract, lib/ocr). Printed part numbers read well;
+// a stamped dash number often doesn't, then the catalogue parts that fit are offered, best match first.
+let OCR = null;
+function ocrCall(msg, transfer) {
+  if (!OCR) {
+    const w = new Worker("lib/ocr/ocr-worker.js");
+    OCR = { w, seq: 0, wait: new Map() };
+    w.onmessage = (ev) => { const m = ev.data || {}; const p = OCR && OCR.wait.get(m.id); if (p) { OCR.wait.delete(m.id); if (m.ok) p.res(m.text || ""); else p.rej(new Error(m.error)); } };
+    w.onerror = () => { if (OCR) { OCR.wait.forEach((p) => p.rej(new Error("worker"))); OCR = null; } w.terminate(); };
+  }
+  const o = OCR, id = ++o.seq;
+  return new Promise((res, rej) => { o.wait.set(id, { res, rej }); o.w.postMessage({ ...msg, id }, transfer || []); });
+}
+// grey and with full contrast, at most 2200 pixels: reads better and faster
+function ocrImage(src, w, h) {
+  const k = Math.min(1, 2200 / Math.max(w, h));
+  const cv = document.createElement("canvas");
+  cv.width = Math.max(1, Math.round(w * k)); cv.height = Math.max(1, Math.round(h * k));
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  g.drawImage(src, 0, 0, cv.width, cv.height);
+  const img = g.getImageData(0, 0, cv.width, cv.height), d = img.data, hist = new Uint32Array(256);
+  for (let i = 0; i < d.length; i += 4) { const y = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8; d[i] = y; hist[y]++; }
+  const n = d.length / 4;
+  let lo = 0, hi = 255, acc = 0;
+  while (lo < 255 && (acc += hist[lo]) < n * 0.02) lo++;
+  acc = 0;
+  while (hi > 0 && (acc += hist[hi]) < n * 0.02) hi--;
+  const span = Math.max(1, hi - lo);
+  for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, ((d[i] - lo) * 255) / span)); d[i] = d[i + 1] = d[i + 2] = v; }
+  g.putImageData(img, 0, 0);
+  return new Promise((res) => cv.toBlob((b) => res(b), "image/jpeg", 0.92));
+}
+async function ocrRead(src, w, h) {
+  const blob = await ocrImage(src, w, h);
+  const buf = await blob.arrayBuffer();
+  let text = await ocrCall({ cmd: "read", image: buf, psm: 11 }, [buf]);
+  const first = parseLabel(text, true);
+  if (!first.pn && !first.choices) {                         // a second way of reading the page
+    const buf2 = await blob.arrayBuffer();
+    text += "\n" + (await ocrCall({ cmd: "read", image: buf2, psm: 6 }, [buf2]));
+  }
+  return text;
+}
+// what was read on a plate: add it when the part number is certain, otherwise offer the choices
+function scanText(text, source) {
+  const lab = parseLabel(text, true);
+  if (lab.sn && !(lab.sn.length >= 4 && /\d.*\d/.test(lab.sn))) lab.sn = "";   // a serial number read wrongly is worse than none
+  if (lab.choices) {
+    SC.ask = SC.ask.filter((a) => a.pn !== lab.pn);
+    SC.ask.unshift(lab); scanList(); scanSound(true);
+    scanMsg("Choose the part", "ok");
+    return true;
+  }
+  if (lab.pn && (lab.known || lab.tagged)) { scanAdd(lab); return true; }
+  return false;
+}
+async function scanReadText() {
+  const v = $("sc-video"), b = $("sc-read");
+  if (!v || !v.videoWidth || SC.reading) return;
+  SC.reading = true;
+  if (b) { b.disabled = true; b.textContent = "Reading…"; }
+  scanMsg("Reading the text…");
+  try {
+    const text = await ocrRead(v, v.videoWidth, v.videoHeight);
+    if (SC.open && !scanText(text, "read")) { scanMsg("No part number found. Move closer, or try Photo", "bad"); scanSound(false); }
+  } catch (_) { scanMsg(navigator.onLine === false ? "Reading text needs the internet once" : "The text could not be read", "bad"); }
+  SC.reading = false;
+  if ($("sc-read")) { $("sc-read").disabled = false; $("sc-read").textContent = "Read text"; }
 }
 
 // the barcode reader: the phone's own when it has one (Android), otherwise ZXing (lib/zxing.js)
@@ -3435,15 +3543,17 @@ function openScanner() {
   const apple = /iPad|iPhone|Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 0;
   el.innerHTML = '<div class="scbar"><span class="t">Scan parts</span><span class="sccount" id="sc-count"></span>' +
     '<button type="button" id="sc-torch" hidden>Light</button><button type="button" id="sc-done" class="scdone">Done</button></div>' +
-    '<div class="scstage" id="sc-stage"><video id="sc-video" playsinline muted autoplay></video><div class="scframe"></div><p class="scnocam" id="sc-nocam"></p><div class="scmsg" id="sc-msg" hidden></div></div>' +
+    '<div class="scstage" id="sc-stage"><video id="sc-video" playsinline muted autoplay></video><div class="scframe"></div><p class="scnocam" id="sc-nocam"></p><div class="scmsg" id="sc-msg" hidden></div>' +
+    '<button type="button" class="scread" id="sc-read">Read text</button></div>' +
     '<div class="scpanel"><form class="scadd" id="sc-form" autocomplete="off"><input id="sc-input" type="text" inputmode="text" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="Part number" aria-label="Part number">' +
     '<button class="btn primary" type="submit">Add</button><label class="btn" for="sc-photo">Photo</label><input id="sc-photo" type="file" accept="image/*" capture="environment" hidden></form>' +
-    (apple ? '<p class="schint">No barcode, or written by hand? Tap the field, then Scan Text.</p>' : "") +
+    (apple ? '<p class="schint">Written by hand? Tap the field, then Scan Text.</p>' : "") +
     '<div class="sclist" id="sc-list"></div></div>';
   el.hidden = false;
-  SC.open = true; SC.rows = []; SC.ask = []; SC.seen.clear();
+  SC.open = true; SC.rows = []; SC.ask = []; SC.seen.clear(); SC.reading = false;
   scanList();
   scanCamera();
+  setTimeout(() => { if (SC.open) ocrCall({ cmd: "init" }).catch(() => {}); }, 800);   // get the text reader ready
 }
 function closeScanner() {
   SC.open = false;
@@ -3465,7 +3575,13 @@ function scanPhoto(file) {
       const det = await scanDecoder();
       let text = null;
       for (const f of [[1, 1], ...SC_CROPS]) { text = await det(scanGrab(img, img.naturalWidth, img.naturalHeight, f)); if (text) break; }
-      if (text) scanHandle(text, "photo"); else { scanMsg("No barcode found in the photo", "bad"); scanSound(false); }
+      if (text) scanHandle(text, "photo");
+      else {
+        // no barcode: read the text on the plate
+        scanMsg("Reading the text…");
+        const words = await ocrRead(img, img.naturalWidth, img.naturalHeight);
+        if (!scanText(words, "photo")) { scanMsg("No part number found in the photo", "bad"); scanSound(false); }
+      }
     } catch (_) { scanMsg("The photo could not be read", "bad"); }
     URL.revokeObjectURL(url);
   };
@@ -3475,6 +3591,7 @@ function scanPhoto(file) {
 function scanClick(t) {
   if (!SC.open) return false;
   if (t.id === "sc-done") { closeScanner(); return true; }
+  if (t.id === "sc-read") { scanReadText(); return true; }
   if (t.id === "sc-torch") {
     SC.torch = !SC.torch;
     if (SC.track) SC.track.applyConstraints({ advanced: [{ torch: SC.torch }] }).catch(() => { SC.torch = false; });
