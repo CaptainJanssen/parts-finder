@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#3a434a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -71,6 +71,8 @@ body.booting > :not(#boot) { display: none !important; }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+/* touch screens: the page keeps its size (no pinch or double-tap zoom, no larger text after turning the iPad); the drawing viewer zooms by itself */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; touch-action: pan-x pan-y; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -3411,6 +3413,11 @@ reindexStock();
 fillSections();
 setView("pick");
 render();
+if (navigator.maxTouchPoints > 0) {
+  // iPad and iPhone ignore "no zooming" in the page settings, so a pinch is stopped here
+  ["gesturestart", "gesturechange", "gestureend"].forEach((t) => document.addEventListener(t, (ev) => ev.preventDefault(), { passive: false }));
+  document.addEventListener("touchmove", (ev) => { if (ev.touches.length > 1 && !ev.target.closest(".dvstage")) ev.preventDefault(); }, { passive: false });
+}
 Backend.init(H).then(() => {
   if ($("syncbtn")) $("syncbtn").hidden = !!(Backend.local && Backend.remote);
   syncDot();
