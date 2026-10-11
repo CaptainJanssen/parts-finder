@@ -1694,16 +1694,12 @@ function renderStock() {
   const cost = active.reduce((s, it) => s + (it.buy ?? 0) * it.qty, 0);
   const ask = active.reduce((s, it) => s + (it.sell ?? 0) * it.qty, 0);
   const noAsk = active.filter((it) => it.sell == null).length;
-  const sold = all.filter((it) => it.status === "sold");
-  const revenue = sold.reduce((s, it) => s + (it.soldPrice ?? 0) * it.qty, 0);
-  const soldCost = sold.reduce((s, it) => s + (it.buy ?? 0) * it.qty, 0);
   const reserved = active.filter((it) => it.status === "reserved").reduce((s, it) => s + it.qty, 0);
   $("tiles").innerHTML =
     '<div class="tile"><div class="k">Units on the shelf</div><div class="v">' + units + '</div></div>' +
     '<div class="tile"><div class="k">Value at cost</div><div class="v">' + esc(EUR0.format(cost)) + '</div></div>' +
     '<div class="tile"><div class="k">Value at asking price</div><div class="v">' + esc(EUR0.format(ask)) + '</div></div>' +
-    '<div class="tile"><div class="k">Potential margin</div><div class="v ' + (ask - cost >= 0 ? "pos" : "neg") + '">' + esc(EUR0.format(ask - cost)) + '</div></div>' +
-    '<div class="tile"><div class="k">Sold</div><div class="v">' + esc(EUR0.format(revenue)) + '</div></div>';
+    '<div class="tile"><div class="k">Potential margin</div><div class="v ' + (ask - cost >= 0 ? "pos" : "neg") + '">' + esc(EUR0.format(ask - cost)) + '</div></div>';
   // filter options
   const locs = [...new Set(all.map((it) => it.loc).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
   $("sac").innerHTML = '<option value="">Any</option>' + AC_OPTIONS.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === W.ac ? " selected" : "") + ">" + esc(l) + "</option>").join("");
