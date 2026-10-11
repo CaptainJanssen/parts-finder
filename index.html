@@ -3407,7 +3407,8 @@ document.addEventListener("focusout", (ev) => {
   if (ev.target.classList && ev.target.classList.contains("price")) setTimeout(() => { const ae = document.activeElement; if (renderPending && !(ae && ae.classList.contains("price")) && !ae?.closest?.(".sheet")) { renderPending = false; render(); renderStock(); } }, 0);
 });
 
-$("foot").innerHTML = (Backend.footerHtml || "") + "Cockpit parts selected from: " + ACS.map((a) => esc(a.name + " (" + a.sub + ", " + Object.keys(a.sections).length + " IPC sections)")).join(" · ") + ". Part data extracted from the IPC PDFs; check the IPC before ordering. Effectivity numbers are the IPC's customer effectivity ranges.";
+$("foot").innerHTML = Backend.footerHtml || "";
+$("foot").hidden = !Backend.footerHtml;
 
 reindexStock();
 fillSections();
