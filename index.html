@@ -221,10 +221,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   main.wrap { flex: 1 1 auto; min-height: 0; width: 100%; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom, 0px); }
 }
 
-.rhead, .row { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(0, 3fr) 96px 96px 104px 152px; gap: 12px; align-items: center; padding: 10px 14px; }
+.rhead, .row { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(0, 3fr) 152px; gap: 12px; align-items: center; padding: 10px 14px; }
 @media (min-width: 761px) and (max-width: 1100px) {
-  .rhead, .row { grid-template-columns: minmax(130px, 1.1fr) minmax(0, 3fr) 90px 90px 96px 92px; }
-  .row .c-act { flex-direction: column; align-items: flex-end; }
+  .rhead, .row { grid-template-columns: minmax(130px, 1fr) minmax(0, 2.6fr) 150px; }
 }
 .rhead, .shead { font-family: var(--f-display); text-transform: uppercase; letter-spacing: .12em; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .rhead .r, .shead .r { text-align: right; }
@@ -248,13 +247,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tag.ref { border-color: var(--amber); color: var(--amber); }
 .tag.unit { border-color: color-mix(in srgb, var(--ink) 35%, transparent); color: var(--ink); }
 .tag.instock { border-color: color-mix(in srgb, var(--good) 50%, transparent); color: var(--good); background: var(--good-bg); }
-.price { width: 100%; text-align: right; border: 1px solid transparent; background: var(--surface-2); border-radius: 5px; padding: 6px 8px; font-variant-numeric: tabular-nums; font-family: var(--f-mono); font-size: 13.5px; }
-.price:hover { border-color: var(--line); }
-.price:focus { border-color: var(--focus); outline: none; background: var(--surface); }
-.price::placeholder { color: color-mix(in srgb, var(--muted) 60%, transparent); }
-.price[readonly] { background: transparent; }
-.c-margin { text-align: right; font-family: var(--f-mono); font-size: 13.5px; font-variant-numeric: tabular-nums; }
-.c-margin small { display: block; font-size: 11.5px; color: var(--muted); }
 .pos { color: var(--good); } .neg { color: var(--bad); }
 .c-act { text-align: right; }
 .addlist { border: 1px solid var(--line); background: transparent; border-radius: 5px; padding: 4px 8px; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
@@ -324,12 +316,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 @media (max-width: 760px) {
   .rhead, .shead { display: none; }
-  .row { grid-template-columns: 1fr 1fr; grid-template-areas: "pn act" "desc desc" "buy sell" "margin margin"; gap: 8px 10px; }
-  .c-pn { grid-area: pn; } .c-desc { grid-area: desc; } .c-buy { grid-area: buy; } .c-sell { grid-area: sell; } .c-margin { grid-area: margin; text-align: left; display: flex; gap: 8px; align-items: baseline; } .c-act { grid-area: act; }
-  .c-margin small { display: inline; }
-  .c-buy::before { content: "Buy €"; } .c-sell::before { content: "Sell €"; }
-  .c-buy::before, .c-sell::before { display: block; font-size: 11px; color: var(--muted); font-family: var(--f-display); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 2px; }
-  .price { text-align: left; }
+  .row { grid-template-columns: 1fr auto; grid-template-areas: "pn act" "desc desc"; gap: 8px 10px; }
+  .c-pn { grid-area: pn; } .c-desc { grid-area: desc; } .c-act { grid-area: act; }
   .bigsearch { font-size: 16px; }
   .srow { grid-template-columns: 1fr auto; grid-template-areas: "part part" "cond qty" "serial loc" "cost ask" "status status"; gap: 6px 10px; }
   .srow > :nth-child(1) { grid-area: part; } .srow > :nth-child(2) { grid-area: cond; } .srow > :nth-child(3) { grid-area: qty; }
@@ -359,7 +347,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .sec { padding-block: 16px 4px; border-bottom: 1px solid var(--line); }
 .sec:last-child { border-bottom: 0; }
 .sec h4 { margin: 0 0 10px; font-family: var(--f-display); font-weight: 500; text-transform: uppercase; letter-spacing: .14em; font-size: 12.5px; color: var(--muted); }
-.pricegrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end; }
+/* part details: what the warehouse asks for this part and what it sold for before */
+.ptiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.ptile { border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; background: var(--surface-2); min-width: 0; }
+.ptile .k { font-family: var(--f-display); text-transform: uppercase; letter-spacing: .1em; font-size: 10.5px; color: var(--muted); }
+.ptile .v { font-family: var(--f-mono); font-size: 15px; font-weight: 600; margin-top: 3px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ptile .s { font-size: 12.5px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.ptile .nw { white-space: nowrap; }
+.pnone { color: var(--muted); font-size: 14px; margin: 2px 0 12px; }
+@media (max-width: 520px) { .ptiles { grid-template-columns: 1fr; } }
 .formgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .formgrid .full { grid-column: 1 / -1; }
 .field { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); min-width: 0; align-content: start; }
@@ -368,7 +364,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--focus); outline: none; background: var(--surface); }
 .field .hint { font-size: 12px; color: var(--muted); }
 .req::after { content: " *"; color: var(--bad); }
-.marginbox { padding: 8px 10px; border-radius: 6px; background: var(--surface-2); font-family: var(--f-mono); font-size: 15px; }
 .note-field { grid-column: 1 / -1; }
 /* Scan parts: camera on top, what was scanned below (side by side on a wide screen) */
 #scanview { position: fixed; inset: 0; z-index: 45; background: #15181d; color: #f2efe4; display: grid; grid-template-rows: auto minmax(180px, 1.2fr) minmax(0, 1fr); padding-top: env(safe-area-inset-top, 0px); }
@@ -672,8 +667,6 @@ table.occ tr:last-child td { border-bottom: 0; }
 .so-act { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 .so-act .xbtn { width: auto; min-width: 30px; height: 30px; font-size: 15px; padding: 0 8px; }
 .so-act .xbtn.arm { color: var(--bad); border-color: var(--bad); font-size: 13px; }
-/* catalogue: under Buy and Sell, what the last one sold went for */
-.hist { display: block; text-align: right; font-size: 11.5px; color: var(--muted); margin-top: 3px; font-family: var(--f-mono); white-space: nowrap; }
 table.sales td.r, table.sales th.r { text-align: right; }
 table.sales tfoot td { font-weight: 600; background: var(--surface-2); border-top: 1px solid var(--line); }
 .countpop .cprow { display: flex; gap: 8px; align-items: center; padding: 4px 4px 2px; }
@@ -720,7 +713,6 @@ table.sales tfoot td { font-weight: 600; background: var(--surface-2); border-to
   .solrow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; grid-template-areas: "part part qty" "buy sold sold" "act act act"; gap: 6px 10px; padding: 10px 12px; }
   .so-part { grid-area: part; } .so-qty { grid-area: qty; align-self: start; } .so-m:nth-of-type(3) { grid-area: buy; text-align: left; } .so-m:nth-of-type(4) { grid-area: sold; text-align: left; }
   .so-act { grid-area: act; justify-content: space-between; }
-  .hist { text-align: left; }
   .dl-pn { grid-area: pn; } .dl-desc { grid-area: desc; } .dl-ac { grid-area: ac; } .dl-st { grid-area: st; } .dl-qty { grid-area: qty; } .dl-x { grid-area: x; }
   .dgroup.sent .dline { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "chk pn pn pn" "chk desc desc desc" "chk ac st qty" "chk x x x"; }
   .dgroup.sent .dl-x { justify-content: flex-start; padding-top: 2px; }
@@ -748,8 +740,6 @@ table.sales tfoot td { font-weight: 600; background: var(--surface-2); border-to
 .csvbox { width: 100%; min-height: 160px; font-family: var(--f-mono); font-size: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); padding: 8px; }
 footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
 @media (max-width: 520px) {
-  .pricegrid { grid-template-columns: 1fr 1fr; }
-  .pricegrid .mfield { grid-column: 1 / -1; }
   .formgrid { grid-template-columns: 1fr; }
   .kv { grid-template-columns: 1fr; gap: 0 0; }
   .kv dt { margin-top: 8px; }
@@ -805,27 +795,23 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
           <select id="section"><option value="">All sections</option></select>
         </label>
         <label for="hidehw"><input type="checkbox" id="hidehw" checked> Hide hardware</label>
-        <label for="pricedonly"><input type="checkbox" id="pricedonly"> Priced only</label>
         <label for="stockonly"><input type="checkbox" id="stockonly"> In stock only</label>
         <label for="sort">Sort
           <select id="sort">
             <option value="rel">Complete units first</option>
             <option value="pn">Part number</option>
             <option value="desc">Description</option>
-            <option value="margin">Margin (high first)</option>
-            <option value="sell">Sell price (high first)</option>
           </select>
         </label>
         <span class="spacer"></span>
-        <button class="btn" id="exportview" type="button" title="Part numbers and IPC references only, safe to send to the dismantling company">Export (no prices)</button>
-        <button class="btn" id="exportviewp" type="button" title="Includes your buy and sell prices, for your own use">Export with prices</button>
+        <button class="btn" id="exportview" type="button" title="Part numbers and IPC references, no prices">Export</button>
       </div>
     </div>
     </div>
 
     <div class="scrollbox" id="pscroll">
     <div class="results" id="results" aria-live="polite">
-      <div class="rhead" aria-hidden="true"><span>Part number</span><span>Description · where it is used</span><span class="r">Buy €</span><span class="r">Sell €</span><span class="r">Margin</span><span></span></div>
+      <div class="rhead" aria-hidden="true"><span>Part number</span><span>Description · where it is used</span><span></span></div>
       <div id="hint"></div>
       <div id="rows"></div>
       <div class="more" id="more" hidden></div>
@@ -1144,13 +1130,13 @@ function scoreEntry(e, clauses) {
 
 /* ---------- State ---------- */
 // ac: null until an aircraft is picked on the start screen, "" for all aircraft, else the aircraft id
-const S = { view: "pick", ac: null, lastAc: null, q: "", cat: "", sec: "", hideHw: true, priced: false, inStock: false, sort: "rel", shown: 60, sel: null };
+const S = { view: "pick", ac: null, lastAc: null, q: "", cat: "", sec: "", hideHw: true, inStock: false, sort: "rel", shown: 60, sel: null };
 const W = { q: "", status: "active", ac: "", cond: "", loc: "", sort: "recent", shown: 100, soldOpen: false, open: new Set() };   // open: part numbers whose units are shown
 try { W.soldOpen = localStorage.getItem("pf-sold-open") === "1"; } catch (_) {}
 try {
   const saved = JSON.parse(localStorage.getItem("ipc-finder-view") || "{}");
   if (typeof saved.hideHw === "boolean") S.hideHw = saved.hideHw;
-  if (saved.sort) S.sort = saved.sort;
+  if (["rel", "pn", "desc"].includes(saved.sort)) S.sort = saved.sort;
   if (typeof saved.ac === "string" && (saved.ac === "" || AC[saved.ac])) S.lastAc = saved.ac;
 } catch (_) {}
 function remember() { try { localStorage.setItem("ipc-finder-view", JSON.stringify({ hideHw: S.hideHw, sort: S.sort, ac: S.ac ?? S.lastAc })); } catch (_) {} }
@@ -1445,11 +1431,6 @@ function parseMoney(v) {
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN;
 }
 function money(n) { return n == null || n === "" ? "" : NUM.format(n); }
-function margin(r) {
-  if (r.buy == null || r.sell == null) return null;
-  const m = r.sell - r.buy;
-  return { m, pct: r.sell > 0 ? (m / r.sell) * 100 : null };
-}
 function normPrice(v) { return { buy: v.buy ?? null, sell: v.sell ?? null, note: v.note || "", qty: v.qty || 0, listed: !!v.listed, sent: v.listed && /^\d{4}-\d\d-\d\d$/.test(v.sent || "") ? v.sent : "", at: v.at || v.updatedAt || "" }; }
 const ORDER_STATUS = [["open", "Open"], ["waiting", "Waiting for parts"], ["ready", "Ready to ship"], ["shipped", "Shipped"], ["cancelled", "Cancelled"]];
 const OSTAT = Object.fromEntries(ORDER_STATUS);
@@ -1611,7 +1592,6 @@ function compute() {
     for (const e of P) {
       if (S.ac && e.ac !== S.ac) continue;
       if (S.sec && !e.secs.has(S.sec)) continue;
-      if (S.priced) { const r = prices.get(e.p); if (!r || (r.buy == null && r.sell == null)) continue; }
       if (S.inStock) { const st = stockByPn.get(e.p); if (!st || !(st.stock + st.reserved)) continue; }
       let sc = { score: 0, group: 2 };
       if (cl.length) { sc = scoreEntry(e, cl); if (!sc) continue; }
@@ -1656,8 +1636,6 @@ function compute() {
        : (a, b) => pnGroup(a) - pnGroup(b) || a[0].tier - b[0].tier || a[1].group - b[1].group || a[0].generic - b[0].generic || b[1].score - a[1].score || cmpDesc(a, b),
     pn: (a, b) => a[0].p.localeCompare(b[0].p, "en", { numeric: true }),
     desc: cmpDesc,
-    margin: (a, b) => (margin(rec(b[0].p))?.m ?? -Infinity) - (margin(rec(a[0].p))?.m ?? -Infinity) || cmpDesc(a, b),
-    sell: (a, b) => (rec(b[0].p).sell ?? -Infinity) - (rec(a[0].p).sell ?? -Infinity) || cmpDesc(a, b),
   };
   list.sort(sorters[S.sort] || sorters.rel);
   return { list: list.map((x) => x[0]), counts, total: base.length, hiddenHw, relaxed };
@@ -1683,30 +1661,13 @@ function ctxLine(e) {
 }
 // one part number fitted at several seats (CAPT, F/O, observer) under different IPC names
 function fitsHtml(e) { return e.ps ? '<div class="fits"><span class="fitl">Fits</span>' + e.ps.map(esc).join(" · ") + "</div>" : ""; }
+// no prices in the catalogue: they live in the warehouse and the orders (and show in the part details)
 function rowHtml(e) {
   const r = rec(e.p);
-  const mg = margin(r);
-  const ro = !Backend.canWrite ? " readonly" : "";
-  const mgHtml = mg ? '<span class="' + (mg.m >= 0 ? "pos" : "neg") + '">' + esc(EUR.format(mg.m)) + "</span><small>" + (mg.pct == null ? "" : esc(mg.pct.toFixed(0)) + "%") + "</small>" : '<span style="color:var(--muted)">–</span>';
-  // the "last" line under Buy and Sell: when only one of them has a price, the other keeps an empty line so both boxes stay level
-  let hb = lastSale(e.p, "buy"), hs = lastSale(e.p, "soldPrice");
-  if (hb || hs) { const gap = '<small class="hist" aria-hidden="true">&nbsp;</small>'; hb = hb || gap; hs = hs || gap; }
   return '<div class="row' + (S.sel === e.idx ? " sel" : "") + '" data-i="' + e.idx + '">' +
     '<div class="c-pn"><span class="pn">' + esc(e.p) + '</span><button class="copy" type="button" data-copy="' + esc(e.p) + '" aria-label="Copy ' + esc(e.p) + '" title="Copy part number">' + COPY_SVG + "</button></div>" +
     '<div class="c-desc"><div class="desc">' + esc(e.d) + "</div>" + fitsHtml(e) + '<div class="ctx">' + ctxLine(e) + "</div></div>" +
-    '<div class="c-buy"><input class="price" inputmode="decimal" data-f="buy" data-pn="' + esc(e.p) + '" value="' + esc(money(r.buy)) + '" placeholder="0,00" aria-label="Buy price for ' + esc(e.p) + '"' + ro + ">" + hb + "</div>" +
-    '<div class="c-sell"><input class="price" inputmode="decimal" data-f="sell" data-pn="' + esc(e.p) + '" value="' + esc(money(r.sell)) + '" placeholder="0,00" aria-label="Sell price for ' + esc(e.p) + '"' + ro + ">" + hs + "</div>" +
-    '<div class="c-margin">' + mgHtml + "</div>" +
     '<div class="c-act">' + rqHtml(e.p) + '<button class="addlist' + (r.listed ? " on" : "") + '" type="button" data-addmenu="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '" aria-haspopup="menu"' + (Backend.canWrite ? "" : " disabled") + ">" + (r.listed ? "✓ Listed" : "+ Add") + "</button></div></div>";
-}
-// under Buy and Sell: what the last one sold was bought for and sold for
-function lastSale(pn, f) {
-  const hist = soldByPn.get(pn);
-  const x = hist && hist.find((it) => it[f] != null);
-  if (!x) return "";
-  const n = hist.reduce((s, it) => s + it.qty, 0);
-  const tip = (f === "buy" ? "Bought for " : "Sold for ") + EUR.format(x[f]) + (x.soldDate ? ", sold " + dateNl(x.soldDate) : "") + (n > 1 ? " · " + n + " sold so far" : "");
-  return '<small class="hist" title="' + esc(tip) + '">last ' + esc(EUR.format(x[f])) + "</small>";
 }
 // how many to add with "+ Add" (per part, back to 1 once added)
 const CQ = new Map();
@@ -1725,7 +1686,7 @@ function rqSet(pn, q) {
 }
 let lastSig = "";
 function render() {
-  const sig = JSON.stringify([S.ac, S.q.trim(), S.cat, S.sec, S.hideHw, S.priced, S.inStock, S.sort]);
+  const sig = JSON.stringify([S.ac, S.q.trim(), S.cat, S.sec, S.hideHw, S.inStock, S.sort]);
   if (sig !== lastSig) { lastSig = sig; $("pscroll").scrollTop = 0; MAIN.scrollTop = 0; }
   const res = compute();
   lastResults = res.list;
@@ -1742,7 +1703,7 @@ function render() {
   const list = res.list.slice(0, S.shown);
   if (!res.list.length) {
     const qtxt = S.q.trim();
-    $("rows").innerHTML = '<div class="empty"><h3>No parts found' + (qtxt ? " for “" + esc(qtxt) + "”" : "") + "</h3><p>" + otherAcHint() + (S.priced ? " “Priced only” is on." : "") + (S.inStock ? " “In stock only” is on." : "") + (S.sec ? " The section filter is on." : "") + "</p></div>";
+    $("rows").innerHTML = '<div class="empty"><h3>No parts found' + (qtxt ? " for “" + esc(qtxt) + "”" : "") + "</h3><p>" + otherAcHint() + (S.inStock ? " “In stock only” is on." : "") + (S.sec ? " The section filter is on." : "") + "</p></div>";
   } else {
     $("rows").innerHTML = list.map(rowHtml).join("");
   }
@@ -1769,16 +1730,15 @@ function otherAcHint() {
 let renderPending = false;
 function softRender() {
   const ae = document.activeElement;
-  if (ae && (ae.classList.contains("price") || ae.closest?.(".sheet"))) { renderPending = true; return; }
+  if (ae && ae.closest?.(".sheet")) { renderPending = true; return; }
   render();
   renderStock();
 }
 function renderStats() {
-  const priced = [...prices.values()].filter((r) => r.buy != null || r.sell != null).length;
   const st = Backend.stateText();
   const t = S.ac ? AC[S.ac].stats : TOTAL;
   const where = S.ac ? AC[S.ac].name + " cockpit" : "all aircraft";
-  $("stats").innerHTML = "<span><b>" + t.pns.toLocaleString("en") + "</b> part numbers · " + esc(where) + "</span><span>from <b>" + t.entries.toLocaleString("en") + "</b> IPC entries</span><span><b>" + priced.toLocaleString("en") + "</b> priced</span>" + '<span class="savestate"><span class="dot ' + st[0] + '"></span>' + esc(st[1]) + "</span>";
+  $("stats").innerHTML = "<span><b>" + t.pns.toLocaleString("en") + "</b> part numbers · " + esc(where) + "</span><span>from <b>" + t.entries.toLocaleString("en") + "</b> IPC entries</span>" + '<span class="savestate"><span class="dot ' + st[0] + '"></span>' + esc(st[1]) + "</span>";
 }
 function toRequestCount() {
   let n = [...prices.values()].filter((r) => r.listed && !r.sent).length;
@@ -2001,7 +1961,7 @@ function askingFor(pn) {
     if (it.pn !== pn || it.sell == null || (it.status !== "stock" && it.status !== "reserved")) continue;
     if (!best || (it.updated || "") > (best.updated || "")) best = it;
   }
-  return best ? best.sell : rec(pn).sell ?? null;
+  return best ? best.sell : null;
 }
 // next to Bought for and Asking price: what the last one sold was bought and sold for
 function sfHints() {
@@ -2018,8 +1978,7 @@ function sfHints() {
 // a part number chosen in the form: fill in the prices that are still empty
 function sfPricesFor(pn) {
   if (!pn) return;
-  const r = rec(pn), ask = askingFor(pn);
-  if ($("sf-buy") && !$("sf-buy").value && r.buy != null) $("sf-buy").value = money(r.buy);
+  const ask = askingFor(pn);
   if ($("sf-sell") && !$("sf-sell").value && ask != null) $("sf-sell").value = money(ask);
   sfHints();
 }
@@ -2110,9 +2069,7 @@ function openStockForm(item, returnTo) {
   const isNew = !item || !item.id;
   const base = normStock({ id: isNew ? newId() : item.id, qty: 1, cond: "AR", status: "stock", received: today(), ...(item || {}) });
   if (isNew && base.pn && byPn.has(base.pn)) {
-    const r = rec(base.pn);
     const e = entryOf(base.pn, base.ac);
-    if (base.buy == null && r.buy != null) base.buy = r.buy;
     if (!base.desc) base.desc = e.d;
     if (!base.ac) base.ac = e.ac;
   }
@@ -2317,12 +2274,40 @@ function salesHtml(pn) {
   const foot = hist.length > 1 ? '<tfoot><tr><td colspan="4">Average per unit</td><td class="r">' + eur(avg("buy")) + '</td><td class="r">' + eur(avg("soldPrice")) + "</td><td></td></tr></tfoot>" : "";
   return '<div class="sec"><h4>Sold before (' + units + ")</h4>" + '<div class="tablewrap"><table class="occ sales"><thead><tr><th>Sold</th><th>Qty</th><th>Cond.</th><th>Serial</th><th class="r">Bought</th><th class="r">Sold for</th><th class="r">Margin</th></tr></thead><tbody>' + rows + "</tbody>" + foot + "</table></div></div>";
 }
+// in the part details: what the warehouse asks for this part, and what it was bought and sold for before
+function priceTilesHtml(pn) {
+  const span = (vals) => {
+    const v = vals.filter((x) => x != null);
+    if (!v.length) return "";
+    const lo = Math.min(...v), hi = Math.max(...v);
+    return EUR.format(lo) + (hi !== lo ? " – " + NUM.format(hi) : "");   // € 300,00 – 320,00
+  };
+  const tile = (k, v, sub) => { sub = sub.filter(Boolean); return '<div class="ptile"><div class="k">' + k + '</div><div class="v">' + esc(v || "–") + "</div>" + (sub.length ? '<div class="s">' + sub.map((x) => '<span class="nw">' + esc(x) + "</span>").join(" · ") + "</div>" : "") + "</div>"; };
+  const st = stockByPn.get(pn);
+  const on = st ? st.ids.map((id) => stock.get(id)).filter((it) => it && (it.status === "stock" || it.status === "reserved")) : [];
+  const hist = soldByPn.get(pn) || [];
+  const tiles = [];
+  if (on.length) {
+    const n = on.reduce((s, it) => s + it.qty, 0), cost = span(on.map((it) => it.buy));
+    tiles.push(tile("Warehouse asking", span(on.map((it) => it.sell)), [cost && "cost " + cost, n + (n === 1 ? " unit" : " units")]));
+  }
+  if (hist.length) {
+    const x = hist[0];
+    tiles.push(tile("Last sold", x.soldPrice != null ? EUR.format(x.soldPrice) : "", [x.buy != null && "bought " + EUR.format(x.buy), dateNl(x.soldDate)]));
+    const units = hist.reduce((s, it) => s + it.qty, 0);
+    if (units > 1) {
+      const avg = (f) => { const xs = hist.filter((it) => it[f] != null); const q = xs.reduce((s, it) => s + it.qty, 0); return q ? xs.reduce((s, it) => s + it[f] * it.qty, 0) / q : null; };
+      const ab = avg("buy"), as = avg("soldPrice");
+      tiles.push(tile("Average sold", as != null ? EUR.format(as) : "", [ab != null && "bought " + EUR.format(ab), units + " sold"]));
+    }
+  }
+  return tiles.length ? '<div class="ptiles">' + tiles.join("") + "</div>" : '<p class="pnone">No prices yet: they come from the warehouse and from sales.</p>';
+}
 function renderDetail(e, keepScroll) {
   const sh = $("detail");
   const body = sh.querySelector(".body");
   const st = keepScroll && body ? body.scrollTop : 0;
   const r = rec(e.p);
-  const mg = margin(r);
   const ro = !Backend.canWrite ? " readonly" : "";
   const alts = e.a || [];
   const names = [e.d, ...(e.n || [])];
@@ -2357,11 +2342,8 @@ function renderDetail(e, keepScroll) {
     (e.p.startsWith("M0DREF") ? '<div class="banner" style="margin-top:14px">M0DREF numbers are Boeing drawing references for an installation. For buying, use the part numbers listed under “Contains”.</div>' : "") +
     (e.c === "install" && e.ac === "A330" ? '<div class="banner" style="margin-top:14px">This is an Airbus installation drawing number. For buying, use the part numbers listed under “Contains”.</div>' : "") +
     drawPlaceholder(e) +
-    '<div class="sec"><h4>Your prices</h4><div class="pricegrid">' +
-    '<label class="field" for="d-buy">Buy price (€)<input id="d-buy" class="m" inputmode="decimal" data-f="buy" data-pn="' + esc(e.p) + '" value="' + esc(money(r.buy)) + '" placeholder="0,00"' + ro + "></label>" +
-    '<label class="field" for="d-sell">Sell price (€)<input id="d-sell" class="m" inputmode="decimal" data-f="sell" data-pn="' + esc(e.p) + '" value="' + esc(money(r.sell)) + '" placeholder="0,00"' + ro + "></label>" +
-    '<div class="field mfield">Margin<div class="marginbox" id="d-margin">' + (mg ? '<span class="' + (mg.m >= 0 ? "pos" : "neg") + '">' + esc(EUR.format(mg.m)) + "</span>" + (mg.pct == null ? "" : " · " + esc(mg.pct.toFixed(1)) + "%") : "–") + "</div></div>" +
-    '<label class="field note-field" for="d-note">Note<textarea id="d-note" rows="2" data-pn="' + esc(e.p) + '"' + ro + ">" + esc(r.note || "") + "</textarea></label></div>" +
+    '<div class="sec"><h4>Prices</h4>' + priceTilesHtml(e.p) +
+    '<label class="field note-field" for="d-note">Note<textarea id="d-note" rows="2" data-pn="' + esc(e.p) + '"' + ro + ">" + esc(r.note || "") + "</textarea></label>" +
     '<div class="listactions" style="margin-top:12px">' + (r.listed
       ? '<span class="qty"><button type="button" data-qty="-1" aria-label="Fewer">−</button><input id="d-qty" inputmode="numeric" value="' + esc(r.qty || 1) + '" aria-label="Quantity wanted"' + ro + '><button type="button" data-qty="1" aria-label="More">+</button></span><button class="btn" type="button" data-list="' + esc(e.p) + '">Cancel request</button>' + (r.sent ? '<span class="note" style="margin:0">requested ' + esc(dateNl(r.sent)) + "</span>" : "")
       : '<button class="btn primary" type="button" data-list="' + esc(e.p) + '"' + (Backend.canWrite ? "" : " disabled") + ">Request for stock</button>") + "</div></div>" +
@@ -2649,7 +2631,7 @@ function addLine(o, pn, ac, qty) {
   const lines = o.lines.map((l) => ({ ...l }));
   const have = lines.find((l) => l.pn === pn);
   if (have) have.qty += qty || 1;
-  else lines.push({ pn, ac: e ? e.ac : ac || "", desc: e ? e.d : "", qty: qty || 1, sell: rec(pn).sell ?? null, req: 0, rstate: "" });
+  else lines.push({ pn, ac: e ? e.ac : ac || "", desc: e ? e.d : "", qty: qty || 1, sell: askingFor(pn), req: 0, rstate: "" });
   return putOrder({ ...o, lines });
 }
 function patchLine(o, i, patch) { const lines = o.lines.map((l, k) => (k === i ? { ...l, ...patch } : { ...l })); return putOrder({ ...o, lines }); }
@@ -2910,10 +2892,9 @@ function dismUnsend(k) {
 // a part that came in from the dismantler waits on the Warehouse page ("To book in") until its details are filled in
 function makeDraft(x, o) {
   const e = entryOf(x.pn, x.ac);
-  const r = rec(x.pn);
   const line = o ? o.lines.find((l) => l.pn === x.pn) : null;
   putStock({ id: newId(), pn: x.pn, desc: x.desc || (e ? e.d : ""), ac: x.ac || (e ? e.ac : ""), qty: x.qty || 1, status: "draft", cond: "AR",
-    received: today(), buy: r.buy ?? null, sell: line && line.sell != null ? line.sell : askingFor(x.pn),
+    received: today(), buy: null, sell: line && line.sell != null ? line.sell : askingFor(x.pn),
     customer: o ? o.customer : "", order: o ? o.no : "" });
 }
 // what goes to the dismantler: part number, description, aircraft, how many and the alternate part numbers - nothing else
@@ -3840,9 +3821,8 @@ function scanAdd(lab) {
     row.qty = it.qty + 1;
   } else {
     const e = entryOf(lab.pn, W.ac || S.ac);
-    const r = rec(lab.pn);
     const it = putStock({ id: newId(), pn: lab.pn, desc: e ? e.d : "", ac: e ? e.ac : (W.ac || S.ac || ""), qty: 1, status: "draft", cond: "AR",
-      received: today(), serial: lab.sn || "", buy: r.buy ?? null, sell: askingFor(lab.pn) });
+      received: today(), serial: lab.sn || "", buy: null, sell: askingFor(lab.pn) });
     SC.rows.unshift({ key, id: it.id, pn: lab.pn, sn: lab.sn || "", qty: 1, known: lab.known });
   }
   SC.ask = SC.ask.filter((a) => a.pn !== lab.pn);
@@ -4167,13 +4147,12 @@ function showTextSheet(title, note, text) {
 }
 
 /* ---------- Export ---------- */
-// prices and notes only go into an export when it is for your own use
-function exportRows(entries, mode, withPrices) {
+// part numbers and IPC references (no prices)
+function exportRows(entries, mode) {
   return entries.map((e) => {
     const r = rec(e.p);
     const o = e.o[0];
     const f = FIGS[o[0]];
-    const mg = margin(r);
     const row = { "Part number": e.p, "Description": e.d };
     row["Aircraft"] = mode === "list" ? acsOf(e.p).map(acName).join(", ") : acName(e.ac);
     if (mode === "list") row["Qty wanted"] = r.qty || 1;
@@ -4185,12 +4164,6 @@ function exportRows(entries, mode, withPrices) {
       "IPC item": o[1],
       "IPC section": f[2] + " " + secTitle(e.ac, f[2]),
     });
-    if (withPrices) {
-      row["Buy price (EUR)"] = r.buy ?? "";
-      row["Sell price (EUR)"] = r.sell ?? "";
-      row["Margin (EUR)"] = mg ? Math.round(mg.m * 100) / 100 : "";
-      row["Note"] = r.note || "";
-    }
     return row;
   });
 }
@@ -4356,18 +4329,6 @@ async function copyText(txt, el) {
     else { const ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (_) {} ta.remove(); toast(ok ? "Copied" : "Copy is blocked here; select the text instead"); }
   }
 }
-function commitPrice(input) {
-  const pn = input.dataset.pn, f = input.dataset.f;
-  const v = parseMoney(input.value);
-  if (Number.isNaN(v)) { toast("Enter a price like 125 or 125,50"); input.value = money(rec(pn)[f]); return; }
-  if ((rec(pn)[f] ?? null) === v) { input.value = money(v); return; }
-  setRec(pn, { [f]: v });
-  input.value = money(v);
-  const row = input.closest(".row");
-  if (row) { const i = +row.dataset.i; const tmp = document.createElement("div"); tmp.innerHTML = rowHtml(P[i]); row.querySelector(".c-margin").innerHTML = tmp.querySelector(".c-margin").innerHTML; }
-  if (!$("detail").hidden && S.sel != null && P[S.sel].p === pn) renderDetail(P[S.sel], true);
-  renderStats();
-}
 function toggleList(pn) {
   if (!Backend.canWrite) return;
   const r = rec(pn);
@@ -4442,10 +4403,10 @@ function addMenuPick(b) {
   if (!Backend.canWrite) { toast("You can only view this page."); return; }
   if (kind === "stock") {
     // into "To book in" on the Warehouse page; a part already waiting there (not for an order) just gets more
-    const e = entryOf(pn, ac), r = rec(pn);
+    const e = entryOf(pn, ac);
     const wait = [...stock.values()].find((s) => s.status === "draft" && s.pn === pn && !s.order);
     if (wait) putStock({ ...wait, qty: wait.qty + q });
-    else putStock({ id: newId(), pn, desc: e ? e.d : "", ac: e ? e.ac : ac, qty: q, status: "draft", cond: "AR", received: today(), buy: r.buy ?? null, sell: askingFor(pn) });
+    else putStock({ id: newId(), pn, desc: e ? e.d : "", ac: e ? e.ac : ac, qty: q, status: "draft", cond: "AR", received: today(), buy: null, sell: askingFor(pn) });
     rqSet(pn, 1);
     renderStock(); render();
     toast(what + " added to To book in");
@@ -4572,7 +4533,6 @@ $("sac").addEventListener("change", (ev) => { W.ac = ev.target.value; renderStoc
 $("scond").innerHTML = '<option value="">Any</option>' + CONDS.map((c) => '<option value="' + c[0] + '">' + c[0] + " – " + esc(c[1]) + "</option>").join("");
 $("hidehw").checked = S.hideHw;
 $("hidehw").addEventListener("change", (ev) => { S.hideHw = ev.target.checked; remember(); render(); });
-$("pricedonly").addEventListener("change", (ev) => { S.priced = ev.target.checked; S.shown = 60; render(); });
 $("stockonly").addEventListener("change", (ev) => { S.inStock = ev.target.checked; S.shown = 60; render(); });
 $("sort").value = S.sort;
 $("sort").addEventListener("change", (ev) => { S.sort = ev.target.value; remember(); render(); });
@@ -4581,8 +4541,7 @@ $("scond").addEventListener("change", (ev) => { W.cond = ev.target.value; render
 $("sloc").addEventListener("change", (ev) => { W.loc = ev.target.value; renderStock(); });
 $("ssort").addEventListener("change", (ev) => { W.sort = ev.target.value; renderStock(); });
 $("chips").addEventListener("click", (ev) => { const b = ev.target.closest(".chip"); if (!b || b.disabled) return; S.cat = b.dataset.cat === S.cat ? "" : b.dataset.cat; S.shown = 60; render(); });
-$("exportview").addEventListener("click", () => doExport(exportRows(lastResults, "view", false), "Parts", "Cockpit parts"));
-$("exportviewp").addEventListener("click", () => doExport(exportRows(lastResults, "view", true), "Parts", "Cockpit parts with prices"));
+$("exportview").addEventListener("click", () => doExport(exportRows(lastResults, "view"), "Parts", "Cockpit parts"));
 $("exportstock").addEventListener("click", (ev) => exportStockPdf(ev.currentTarget));
 $("addstock").addEventListener("click", () => openStockForm(null, null));
 let oqTimer = null;
@@ -4751,21 +4710,16 @@ document.addEventListener("change", (ev) => {
   if (t.id === "sc-photo") { scanPhoto(t.files && t.files[0]); t.value = ""; return; }
   if (t.id === "sync-file") { readSyncFile(t.files && t.files[0]); t.value = ""; return; }
   if (t.id && t.id.startsWith("co-")) return;
-  if (t.dataset && t.dataset.f) commitPrice(t);
-  else if (t.id === "d-note") { setRec(t.dataset.pn, { note: t.value.trim().slice(0, 500) }); }
+  if (t.id === "d-note") { setRec(t.dataset.pn, { note: t.value.trim().slice(0, 500) }); }
   else if (t.id === "d-qty") { setQty(P[S.sel].p, +t.value); t.value = rec(P[S.sel].p).qty; }
   else orderChange(t);
 });
 document.addEventListener("keydown", (ev) => {
   const t = ev.target;
-  if (ev.key === "Enter" && t.dataset && t.dataset.f) { ev.preventDefault(); t.blur(); }
   // Enter in the parts window adds the top part; the text stays selected, so the next part number can be typed over it
   if (ev.key === "Enter" && t.id === "pk-q") { ev.preventDefault(); clearTimeout(PK.timer); pkSearch(); const first = document.querySelector("#pk-list [data-pk]"); if (first) { pkAdd(first); t.select(); } return; }
   if (ev.key === "Enter" && ["on-customer", "on-ref", "on-contact", "on-email"].includes(t.id)) { ev.preventDefault(); document.querySelector("[data-ocreate]")?.click(); return; }
   if (ev.key === "Enter" && t.id === "sf-pn") { const first = document.querySelector("#sf-sugg [data-pick]"); if (first) { ev.preventDefault(); pickSuggestion(first.dataset.pick, first.dataset.ac); } }
-});
-document.addEventListener("focusout", (ev) => {
-  if (ev.target.classList && ev.target.classList.contains("price")) setTimeout(() => { const ae = document.activeElement; if (renderPending && !(ae && ae.classList.contains("price")) && !ae?.closest?.(".sheet")) { renderPending = false; render(); renderStock(); } }, 0);
 });
 
 $("foot").innerHTML = Backend.footerHtml || "";
