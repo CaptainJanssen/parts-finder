@@ -5037,6 +5037,9 @@ Backend.init(H).then(() => {
     } else setTimeout(() => PFC.checkCatalogue(), 4000);
     let DATA;
     try { DATA = JSON.parse(cat.text); } catch (_) { await PFC.put("kv", null, "catalogue").catch(() => {}); return problem("The parts catalogue on this device was damaged."); }
+    // the aircraft names come with the app, so a new name shows at once, also with a catalogue kept on this device from before
+    const labels = {"B737": {"name": "Boeing 737NG", "short": "737NG", "sub": "737-600/700/800/900"}, "B747": {"name": "Boeing 747-400", "short": "747-400", "sub": ""}, "A320": {"name": "Airbus A32X", "short": "A32X", "sub": "A318/A319/A320/A321"}, "A330": {"name": "Airbus A330", "short": "A330", "sub": ""}};
+    if (labels) (DATA.aircraft || []).forEach((a) => { if (labels[a.id]) Object.assign(a, labels[a.id]); });
     document.body.classList.remove("booting");
     $("boot").remove();
     window.PF_MAIN(DATA);
