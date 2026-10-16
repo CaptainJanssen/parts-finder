@@ -485,6 +485,9 @@ table.occ tr:last-child td { border-bottom: 0; }
 /* "Add a part" on the To dismantler tab: looks like the search box, opens the parts window */
 .daddbtn { display: block; width: 100%; text-align: left; color: var(--muted); cursor: pointer; }
 .daddbtn:hover { border-color: var(--muted); color: var(--ink); }
+/* a form's entries that were not saved yet, back from last time */
+.draftbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; margin: 10px 0 6px; border-radius: 8px; background: var(--amber-bg); border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent); font-size: 13.5px; }
+.onew > .draftbar { margin-top: 0; }
 .pk-n.sent { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: var(--good-bg); }
 #olist { padding-top: 6px; }
 .onew { padding: 16px 18px 18px; margin-bottom: 16px; }
@@ -1952,7 +1955,90 @@ function sfPricesFor(pn) {
   if ($("sf-sell") && !$("sf-sell").value && ask != null) $("sf-sell").value = money(ask);
   sfHints();
 }
+/* ---------- Drafts: what you type in a form stays on this device until you save it ----------
+   Closing a form by accident (×, Cancel, a tap next to it, Esc, the app going away) loses nothing: the next time the same
+   form opens (the same stock item, Add stock, New order, Company details) the entries come back, with "Discard" to start over. */
+const DRAFT_DAYS = 30;
+const DR = { timer: 0, pending: null };
+function draftGet(key) {
+  try { const d = JSON.parse(localStorage.getItem(key) || "null"); if (d && Date.now() - d.at < DRAFT_DAYS * 864e5) return d; } catch (_) {}
+  return null;
+}
+function draftPut(key, d) { try { localStorage.setItem(key, JSON.stringify(d)); } catch (_) {} }
+function draftDrop(key) { clearTimeout(DR.timer); DR.pending = null; try { localStorage.removeItem(key); } catch (_) {} }
+const sfDraftKey = () => (SF ? "pf-draft:stock:" + (SF.isNew ? "new:" + (SF.newKey || "") : SF.item.id) : "");
+const DRAFT_FORMS = {
+  sf: { root: () => $("sf"), key: sfDraftKey },
+  co: { root: () => $("coform"), key: () => "pf-draft:company" },
+  on: { root: () => document.querySelector(".onew"), key: () => "pf-draft:neworder" },
+};
+function draftKind(el) {
+  if (!el || !el.closest) return null;
+  if (el.closest("#sf")) return SF ? "sf" : null;
+  if (el.closest("#coform")) return "co";
+  if (el.closest(".onew")) return "on";
+  return null;
+}
+function draftValues(kind) {
+  const root = DRAFT_FORMS[kind].root();
+  if (!root) return null;
+  const vals = {};
+  root.querySelectorAll("input[id], select[id], textarea[id]").forEach((el) => { if (el.type !== "file") vals[el.id] = el.value; });
+  const d = { at: Date.now(), vals };
+  if (kind === "sf") { sfKeep(); d.qty = SF.qty; d.extra = SF.extra; }
+  if (kind === "co") { const sh = $("msgsheet"); d.logo = [sh.dataset.logo || "", +sh.dataset.logow || 0, +sh.dataset.logoh || 0]; }
+  return d;
+}
+// after a change in a form: its entries are kept a moment later (and right away when the form closes)
+function draftLater(el) {
+  if (!Backend.canWrite) return;
+  const kind = draftKind(el);
+  if (!kind) return;
+  DR.pending = { kind, key: DRAFT_FORMS[kind].key() };
+  clearTimeout(DR.timer);
+  DR.timer = setTimeout(draftNow, 300);
+}
+function draftNow() {
+  clearTimeout(DR.timer);
+  const p = DR.pending;
+  DR.pending = null;
+  if (!p || !p.key) return;
+  const d = draftValues(p.kind);
+  if (d) draftPut(p.key, d);
+}
+const draftWhen = (t) => { const d = new Date(t); return String(d.getDate()).padStart(2, "0") + "-" + String(d.getMonth() + 1).padStart(2, "0") + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+const draftBar = (kind, d) => '<div class="draftbar"><span>Unsaved entries from ' + esc(draftWhen(d.at)) + ' are back</span><button class="btn small" type="button" data-draftdrop="' + kind + '">Discard</button></div>';
+// a form that just opened: put back what was typed in it last time
+function draftRestore(kind) {
+  if (!Backend.canWrite) return false;
+  const d = draftGet(DRAFT_FORMS[kind].key());
+  if (!d) return false;
+  if (kind === "sf") { if (d.qty) SF.qty = d.qty; SF.extra = Array.isArray(d.extra) ? d.extra : []; renderStockForm(); }
+  for (const [id, v] of Object.entries(d.vals || {})) { const el = $(id); if (el && el.type !== "file") el.value = v; }
+  if (kind === "sf") {
+    $("sf-soldbox").hidden = $("sf-status").value !== "sold";
+    const pn = $("sf-pn").value.trim().toUpperCase();
+    $("sf-pninfo").innerHTML = !pn ? "" : byPn.has(pn) ? '<span class="pnok">✓ In the IPC catalogue (' + esc(acsOf(pn).map(acShort).join(", ")) + ")</span>" : '<span class="pnwarn">Not in the IPC catalogue</span>';
+    sfHints(); sfHeads();
+  }
+  if (kind === "co" && d.logo) {
+    const sh = $("msgsheet");
+    [sh.dataset.logo, sh.dataset.logow, sh.dataset.logoh] = d.logo;
+    sh.querySelector(".logobox").innerHTML = d.logo[0] ? '<img src="' + d.logo[0] + '" alt="Logo">' : '<span class="muted">No logo</span>';
+  }
+  DRAFT_FORMS[kind].root().insertAdjacentHTML("afterbegin", draftBar(kind, d));
+  return true;
+}
+function draftDiscard(kind) {
+  draftDrop(DRAFT_FORMS[kind].key());
+  if (kind === "sf" && SF) { const { orig, returnTo } = SF; openStockForm(orig, returnTo); }
+  else if (kind === "co") openCompany();
+  else if (kind === "on") { L.onDraft = false; renderOrders(); $("on-customer")?.focus(); }
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) draftNow(); });
+window.addEventListener("pagehide", draftNow);
 function openStockForm(item, returnTo) {
+  draftNow();
   const isNew = !item || !item.id;
   const base = normStock({ id: isNew ? newId() : item.id, qty: 1, cond: "AR", status: "stock", received: today(), ...(item || {}) });
   if (isNew && base.pn && byPn.has(base.pn)) {
@@ -1967,12 +2053,14 @@ function openStockForm(item, returnTo) {
   const isDraft = base.status === "draft";
   // booking in: parts for a customer order are reserved for that customer, the rest go into stock
   if (isDraft) base.status = base.order ? "reserved" : "stock";
-  SF = { item: base, isNew, isDraft, returnTo: returnTo ?? null, delArm: false, qty: base.qty, extra: [] };
-  $("detail").hidden = true; $("msgsheet").hidden = true;
+  // newKey: a new item's draft is kept per part it was opened for ("" for Add stock)
+  SF = { item: base, isNew, isDraft, returnTo: returnTo ?? null, delArm: false, qty: base.qty, extra: [], orig: item, newKey: isNew ? (item && item.pn) || "" : "" };
+  $("detail").hidden = true; $("msgsheet").hidden = true; $("pickersheet").hidden = true;
   renderStockForm();
+  const restored = draftRestore("sf");
   $("stocksheet").hidden = false;
   $("scrim").hidden = false;
-  setTimeout(() => { if (isNew && !base.pn) $("sf-pn").focus(); }, 30);
+  setTimeout(() => { if (isNew && !base.pn && !restored) $("sf-pn").focus(); }, 30);
 }
 function renderStockForm() {
   const it = SF.item;
@@ -2063,6 +2151,7 @@ function sfStep(kind, i, d) {
   } else if (kind === "add") { if (main > 1) SF.extra.push({ n: 1, serial: "", loc: "", from: "", received: $("sf-received").value }); }
   else if (kind === "del") SF.extra.splice(i, 1);
   sfDraw();
+  draftLater($("sf"));
 }
 function readStockForm() {
   const it = { ...SF.item };
@@ -2101,10 +2190,11 @@ function saveStockForm(addAnother) {
   }
   putStock(it);
   for (const e of extra) putStock({ ...it, id: newId(), qty: e.n, serial: e.serial, loc: e.loc, from: e.from, received: e.received, created: "" });
+  draftDrop(sfDraftKey());   // saved: no draft needed any more
   toast(SF.isNew || SF.isDraft ? "Added " + it.pn + " to the warehouse" : "Saved " + it.pn);
   if (addAnother) {
     const next = { ...it, id: newId(), serial: "", notes: "", condNote: "", qty: 1, status: "stock", soldPrice: null, soldDate: "", customer: "", created: "", updated: "" };
-    SF = { item: normStock(next), isNew: true, returnTo: SF.returnTo, delArm: false, qty: 1, extra: [] };
+    SF = { item: normStock(next), isNew: true, returnTo: SF.returnTo, delArm: false, qty: 1, extra: [], orig: { pn: it.pn, ac: it.ac }, newKey: it.pn };
     renderStockForm();
     $("sf-serial").focus();
     renderStock(); render();
@@ -2124,6 +2214,7 @@ function pickSuggestion(pn, ac) {
   $("sf-sugg").innerHTML = "";
   $("sf-pninfo").innerHTML = '<span class="pnok">✓ In the IPC catalogue (' + esc(acsOf(pn).map(acShort).join(", ")) + ")</span>";
   $("sf-pn").blur();   // the keyboard closes, so the quantity counter is in view
+  draftLater($("sf"));
 }
 
 /* ---------- Detail sheet ---------- */
@@ -2442,6 +2533,7 @@ function openDetail(i) {
   $("detail").querySelector(".xbtn").focus({ preventScroll: true });
 }
 function closeSheets() {
+  draftNow();   // whatever was typed in an open form is kept
   if (DV.open) { $("drawview").hidden = true; DV.open = false; }
   ["detail", "stocksheet", "msgsheet", "pickersheet", "scrim"].forEach((id) => { $(id).hidden = true; });
   S.sel = null; SF = null;
@@ -2577,12 +2669,15 @@ function ordersHtml(ro) {
   const shown = all.filter((o) => (L.filter === "all" || q || isOpenOrder(o) || o.id === L.open) && orderMatches(o, q));
   let h = "";
   if (L.creating) {
-    h += '<div class="results onew"><h3 class="onewh">New order <span class="mono muted">' + esc(L.newNo) + "</span></h3>" +
+    // what was typed here before (kept as a draft until the order is created)
+    const nd = Backend.canWrite ? draftGet("pf-draft:neworder") : null;
+    const nv = (id) => ' value="' + esc(((nd && nd.vals) || {})[id] || "") + '"';
+    h += '<div class="results onew">' + (L.onDraft && nd ? draftBar("on", nd) : "") + '<h3 class="onewh">New order <span class="mono muted">' + esc(L.newNo) + "</span></h3>" +
       (L.addAfter ? '<p class="note" style="margin:0 0 10px">With ' + (L.addAfter.q > 1 ? L.addAfter.q + " × " : "") + '<span class="mono">' + esc(L.addAfter.pn) + "</span></p>" : "") + '<div class="ofields">' +
-      '<label class="field" for="on-customer"><span class="req">Customer</span><input id="on-customer" autocomplete="off"></label>' +
-      '<label class="field" for="on-ref">Their reference<input id="on-ref" autocomplete="off"></label>' +
-      '<label class="field" for="on-contact">Contact<input id="on-contact" autocomplete="off"></label>' +
-      '<label class="field" for="on-email">Email<input id="on-email" type="email" autocomplete="off"></label></div>' +
+      '<label class="field" for="on-customer"><span class="req">Customer</span><input id="on-customer" autocomplete="off"' + nv("on-customer") + "></label>" +
+      '<label class="field" for="on-ref">Their reference<input id="on-ref" autocomplete="off"' + nv("on-ref") + "></label>" +
+      '<label class="field" for="on-contact">Contact<input id="on-contact" autocomplete="off"' + nv("on-contact") + "></label>" +
+      '<label class="field" for="on-email">Email<input id="on-email" type="email" autocomplete="off"' + nv("on-email") + "></label></div>" +
       '<div class="listactions" style="margin:14px 0 0"><button class="btn primary" type="button" data-ocreate>Create order</button><button class="btn" type="button" data-ocancel>Cancel</button></div></div>';
   }
   if (!shown.length) {
@@ -2898,17 +2993,18 @@ function orderClick(t) {
   if ((b = q("[data-ofilter]"))) { L.filter = b.dataset.ofilter; renderOrders(); return true; }
   if (q("[data-onew]")) {
     if (!ordersReady()) return true;
-    if (!L.creating) L.newNo = newOrderNo();
+    if (!L.creating) { L.newNo = newOrderNo(); L.onDraft = !!draftGet("pf-draft:neworder"); }
     L.creating = true; L.tab = "orders"; renderOrders(); $("oscroll").scrollTop = 0; MAIN.scrollTop = 0;
     $("on-customer")?.focus(); return true;
   }
-  if (q("[data-ocancel]")) { L.creating = false; L.addAfter = null; renderOrders(); return true; }
+  if (q("[data-ocancel]")) { draftNow(); L.creating = false; L.addAfter = null; renderOrders(); return true; }
   if (q("[data-ocreate]")) {
     if (!ordersReady()) return true;
     const customer = ($("on-customer")?.value || "").trim();
     if (!customer) { toast("Enter the customer name."); $("on-customer")?.focus(); return true; }
     let o = newOrder({ no: L.newNo, customer, ref: ($("on-ref")?.value || "").trim(), contact: ($("on-contact")?.value || "").trim(), email: ($("on-email")?.value || "").trim() });
     if (L.addAfter) { o = addLine(o, L.addAfter.pn, L.addAfter.ac, L.addAfter.q || 1); L.addAfter = null; }   // the part picked with "+ Add" in the catalogue
+    draftDrop("pf-draft:neworder"); L.onDraft = false;
     L.creating = false; L.open = o.id; L.q = ""; $("oq").value = ""; $("clearoq").hidden = true;
     renderOrders(); scrollToOpenOrder();
     toast(orderLabel(o) + " created");
@@ -2939,7 +3035,7 @@ function orderClick(t) {
   if ((b = q("[data-oquote]"))) { makeDoc("quote", b.dataset.oquote, b); return true; }
   if ((b = q("[data-oinvoice]"))) { makeDoc("invoice", b.dataset.oinvoice, b); return true; }
   if ((b = q("[data-company]"))) { openCompany(); return true; }
-  if (t.id === "co-logodel") { const sh = $("msgsheet"); sh.dataset.logo = ""; sh.dataset.logow = 0; sh.dataset.logoh = 0; sh.querySelector(".logobox").innerHTML = '<span class="muted">No logo</span>'; t.remove(); return true; }
+  if (t.id === "co-logodel") { const sh = $("msgsheet"); sh.dataset.logo = ""; sh.dataset.logow = 0; sh.dataset.logoh = 0; sh.querySelector(".logobox").innerHTML = '<span class="muted">No logo</span>'; t.remove(); draftLater($("coform")); return true; }
   if ((b = q("[data-oexport]"))) { const oo = orders.get(b.dataset.oexport); if (oo) doExport(orderRows(oo), "Order " + oo.no, "Order " + oo.no + (oo.customer ? " " + oo.customer : "")); return true; }
   if ((b = q("[data-odel]"))) {
     const id = b.dataset.odel;
@@ -3288,6 +3384,7 @@ async function makeDoc(kind, oid, btn) {
 
 // ---- Company details sheet
 function openCompany() {
+  draftNow();
   const c = company;
   const ro = !Backend.canWrite ? " disabled" : "";
   const f = (k, lab, extra) => '<label class="field' + (extra && extra.full ? " full" : "") + '" for="co-' + k + '">' + lab + '<input id="co-' + k + '" value="' + esc(c[k]) + '"' + (extra && extra.mode ? ' inputmode="' + extra.mode + '"' : "") + ' autocomplete="off"' + ro + "></label>";
@@ -3307,6 +3404,7 @@ function openCompany() {
     ta("quoteNote", "Note on quotes", 2) + ta("invoiceNote", "Note on invoices", 2) + "</div></div>" +
     '<div class="formactions">' + (Backend.canWrite ? '<button class="btn primary" type="submit">Save</button>' : "") + '<button class="btn" type="button" data-close>Cancel</button></div></form>';
   sh.dataset.logo = c.logo || ""; sh.dataset.logow = c.logoW || 0; sh.dataset.logoh = c.logoH || 0;
+  draftRestore("co");
   sh.hidden = false; $("scrim").hidden = false;
   setTimeout(() => $("co-name")?.focus(), 30);
 }
@@ -3320,6 +3418,7 @@ async function saveCompany() {
     logo: sh.dataset.logo, logoW: +sh.dataset.logow, logoH: +sh.dataset.logoh, at: nowIso() });
   company = c;
   syncDot();
+  draftDrop("pf-draft:company");
   closeSheets();
   try { await Backend.saveCompany(c); toast("Company details saved"); } catch (_) { toast("The company details were not saved. Try again."); }
   if (S.view === "orders") renderOrders();
@@ -3343,6 +3442,7 @@ function loadLogo(file) {
       if (box) box.innerHTML = '<img src="' + url + '" alt="Logo">';
       const lab = sh.querySelector('label[for="co-logofile"]');
       if (lab) lab.textContent = "Change logo";
+      draftLater($("coform"));
     };
     img.src = rd.result;
   };
@@ -4153,7 +4253,7 @@ function addMenuPick(b) {
     if (o && ordersReady()) { addLine(o, pn, ac, q); rqSet(pn, 1); toast("Added " + what + " to " + orderLabel(o) + (o.customer ? " · " + o.customer : "")); }
   } else if (kind === "neworder") {
     if (!ordersReady()) return;
-    if (!L.creating) L.newNo = newOrderNo();
+    if (!L.creating) { L.newNo = newOrderNo(); L.onDraft = !!draftGet("pf-draft:neworder"); }
     L.creating = true; L.tab = "orders"; L.addAfter = { pn, ac, q };
     rqSet(pn, 1);
     setView("orders");
@@ -4175,6 +4275,7 @@ document.addEventListener("scroll", closeOnMove, true);
 window.addEventListener("resize", closeOnMove);
 function setView(v) {
   closeAddMenu();
+  draftNow();
   if (v === "parts" && S.ac == null) v = "pick";      // the catalogue needs an aircraft first
   if (S.view !== v) MAIN.scrollTop = 0;               // phones: each view starts at its top
   S.view = v;
@@ -4301,6 +4402,8 @@ document.addEventListener("keydown", (ev) => {
 
 document.addEventListener("click", (ev) => {
   const t = ev.target;
+  const ddr = t.closest("[data-draftdrop]");
+  if (ddr) { draftDiscard(ddr.dataset.draftdrop); return; }
   const opk = t.closest("[data-opicker]");
   if (opk) { openPicker(opk.dataset.opicker); return; }
   if (t.closest("[data-dpicker]")) { openPicker(null); return; }
@@ -4363,6 +4466,7 @@ document.addEventListener("click", (ev) => {
     const word = SF.isDraft ? "Discard" : "Delete";
     if (!SF.delArm) { SF.delArm = true; t.textContent = "Confirm " + word.toLowerCase(); setTimeout(() => { if (SF && SF.delArm) { SF.delArm = false; const b = $("sf-delete"); if (b) b.textContent = word; } }, 4000); return; }
     const back = SF.returnTo; const pn = SF.item.pn; const wasDraft = SF.isDraft;
+    draftDrop(sfDraftKey());
     removeStock(SF.item.id); closeSheets(); renderStock(); render(); toast(wasDraft ? "Discarded " + pn : "Deleted " + pn + " from the warehouse");
     if (back != null) openDetail(back);
     return;
@@ -4407,6 +4511,7 @@ document.addEventListener("submit", (ev) => {
 });
 document.addEventListener("input", (ev) => {
   const t = ev.target;
+  draftLater(t);   // typed in a form: kept as a draft until it is saved
   if (t.id === "sf-serial" || t.dataset.xf === "serial") { sfKeep(); sfHeads(); return; }
   if (t.id === "sf-pn") {
     const val = t.value.trim();
@@ -4423,6 +4528,7 @@ document.addEventListener("input", (ev) => {
 });
 document.addEventListener("change", (ev) => {
   const t = ev.target;
+  draftLater(t);
   if (t.classList && t.classList.contains("stsel")) { stockStatus(t); return; }
   if (t.classList && t.classList.contains("ostsel")) { const o = orders.get(t.dataset.oid); orderChange(t); if (o) toast(orderLabel(o) + " · " + OSTAT[t.value]); return; }
   if (t.id === "sf-status") { $("sf-soldbox").hidden = t.value !== "sold"; if (t.value === "sold" && !$("sf-solddate").value) $("sf-solddate").value = today(); return; }
