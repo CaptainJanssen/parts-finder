@@ -274,8 +274,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* Warehouse */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; padding-block: 20px 6px; }
-#tiles { grid-template-columns: repeat(3, minmax(0, 200px)); }
-@media (max-width: 760px) { #tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+#tiles { grid-template-columns: repeat(3, minmax(0, 200px)) minmax(0, 300px); }
+#tiles .valtile .k, #tiles .valtile .v, #tiles .valtile .s { display: block; }
+#tiles .valtile .nw { white-space: nowrap; }
+@media (max-width: 760px) { #tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } #tiles .valtile { grid-column: 1 / -1; } }
 .tilebtn { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .tilebtn .k, .tilebtn .v { display: block; }
 .tilebtn:hover:not(:disabled) { border-color: var(--muted); }
@@ -1917,7 +1919,13 @@ function renderStock() {
   const units = (st) => [...stock.values()].filter((it) => it.status === st).reduce((s, it) => s + it.qty, 0);
   const toBook = units("draft");
   const tile = (key, label, n, cls, dis) => '<button class="tile tilebtn' + (cls || "") + '" type="button" data-wtile="' + key + '" aria-pressed="' + (W.status === key) + '"' + (dis ? " disabled" : "") + '><span class="k">' + label + '</span><span class="v">' + n + "</span></button>";
-  $("tiles").innerHTML = tile("stock", "Available", units("stock")) + tile("reserved", "Reserved", units("reserved")) + tile("draft", "To book in", toBook, toBook ? " todo" : "", !toBook);
+  // what everything on the shelf (available and reserved) is worth at its asking price
+  const worth = (st) => [...stock.values()].filter((it) => it.status === st).reduce((s, it) => s + (it.sell ?? 0) * it.qty, 0);
+  const vStock = worth("stock"), vRes = worth("reserved");
+  const noPrice = [...stock.values()].filter((it) => (it.status === "stock" || it.status === "reserved") && it.sell == null).reduce((s, it) => s + it.qty, 0);
+  const vSub = [vRes ? "reserved " + EUR.format(vRes) : "", noPrice ? noPrice + (noPrice === 1 ? " unit" : " units") + " without a price" : ""].filter(Boolean).map((x) => '<span class="nw">' + esc(x) + "</span>").join(" · ");
+  $("tiles").innerHTML = tile("stock", "Available", units("stock")) + tile("reserved", "Reserved", units("reserved")) + tile("draft", "To book in", toBook, toBook ? " todo" : "", !toBook) +
+    '<div class="tile valtile"><span class="k">Value</span><span class="v">' + esc(EUR.format(vStock + vRes)) + "</span>" + (vSub ? '<span class="s">' + vSub + "</span>" : "") + "</div>";
   // filter options
   const locs = [...new Set(all.map((it) => it.loc).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
   $("sac").innerHTML = '<option value="">Any</option>' + AC_OPTIONS.map(([v, l]) => '<option value="' + esc(v) + '"' + (v === W.ac ? " selected" : "") + ">" + esc(l) + "</option>").join("");
