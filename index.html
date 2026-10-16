@@ -4475,8 +4475,9 @@ function setView(v) {
   if (v === "stock") renderStock();
   if (v === "orders") renderOrders();
   if (v === "pick") renderPicker();
-  // the footer (with Close program) sits at the end of whatever scrolls in this view
-  ({ parts: $("pscroll"), stock: $("sscroll"), orders: $("oscroll"), pick: $("view-pick") })[v].appendChild($("foot"));
+  // the PC program's buttons (Phone access, Open Excel sheet, Close program …) only on the aircraft choice page
+  $("view-pick").appendChild($("foot"));
+  $("foot").hidden = !Backend.footerHtml || v !== "pick";
 }
 
 /* ---------- Aircraft ---------- */
@@ -4744,7 +4745,7 @@ document.addEventListener("keydown", (ev) => {
 });
 
 $("foot").innerHTML = Backend.footerHtml || "";
-$("foot").hidden = !Backend.footerHtml;
+$("foot").hidden = !Backend.footerHtml || S.view !== "pick";
 
 reindexStock();
 fillSections();
