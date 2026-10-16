@@ -4194,14 +4194,151 @@ function exportRows(entries, mode, withPrices) {
     return row;
   });
 }
-function stockRows(items) {
-  return items.map((it) => ({
-    "Part number": it.pn, "Description": it.desc, "Aircraft": acName(it.ac), "Qty": it.qty, "Condition": it.cond + " – " + (COND[it.cond] || COND.AR)[1],
-    "Cosmetic grade": it.grade, "Condition notes": it.condNote, "Serial number": it.serial, "Location": it.loc,
-    "Removed from": it.from, "Received": dateNl(it.received), "Status": STATUS[it.status],
-    "Cost per unit (EUR)": it.buy ?? "", "Asking per unit (EUR)": it.sell ?? "",
-    "Sold per unit (EUR)": it.soldPrice ?? "", "Sold on": dateNl(it.soldDate), "Customer": it.customer, "Notes": it.notes,
-  }));
+// The stock list to share (A4 PDF): part number, description, aircraft, condition, qty and asking price only;
+// no costs, serial numbers, locations or customers. Units free to sell (or the reserved ones when the list shows those),
+// within the search and filters; the same part in the same condition at the same price is one line.
+function stockPdfRows() {
+  const by = new Map();
+  for (const it of stockList()) {
+    if (W.status !== "reserved" && it.status !== "stock") continue;
+    const k = [it.pn, it.ac, it.cond, it.sell ?? ""].join("|");
+    const r = by.get(k);
+    if (r) { r.qty += it.qty; continue; }
+    const e = entryOf(it.pn, it.ac);
+    by.set(k, { pn: it.pn, desc: it.desc || (e ? e.d : ""), ac: it.ac, cond: it.cond, qty: it.qty, sell: it.sell ?? null });
+  }
+  const acAt = (ac) => { const i = AC_OPTIONS.findIndex(([v]) => v === ac); return i < 0 ? 99 : i; };
+  const cAt = (c) => CONDS.findIndex((x) => x[0] === c);
+  return [...by.values()].sort((a, b) => acAt(a.ac) - acAt(b.ac) || a.pn.localeCompare(b.pn, "en", { numeric: true }) || cAt(a.cond) - cAt(b.cond) || (a.sell ?? 0) - (b.sell ?? 0));
+}
+async function buildStockPdf(rows) {
+  const PL = await loadPdfLib();
+  const { PDFDocument, StandardFonts, rgb } = PL;
+  const C = company;
+  const doc = await PDFDocument.create();
+  const F = await doc.embedFont(StandardFonts.Helvetica), B = await doc.embedFont(StandardFonts.HelveticaBold);
+  let logo = null;
+  if (C.logo && C.logoW && C.logoH) { try { const by = dataUrlBytes(C.logo); logo = C.logo.startsWith("data:image/png") ? await doc.embedPng(by) : await doc.embedJpg(by); } catch (_) { logo = null; } }
+  const PW = 595.28, H = 841.89, M = 40, R = PW - M;   // A4
+  const INK = rgb(0.1, 0.12, 0.15), MUTED = rgb(0.42, 0.45, 0.5), FAINT = rgb(0.64, 0.67, 0.71), LINE = rgb(0.86, 0.88, 0.9),
+    BAND = rgb(0.953, 0.96, 0.968), ACC = rgb(0.07, 0.2, 0.32);
+  const eur = (n) => "€ " + n.toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const date = dateNl(today());
+  const pages = [];
+  let page = null;
+  const tw = (s, size, f = F) => f.widthOfTextAtSize(pdfText(s), size);
+  const txt = (s, x, y, size, f = F, color = INK) => { const v = pdfText(s); if (v.trim()) page.drawText(v, { x, y, size, font: f, color }); };
+  const rtxt = (s, xr, y, size, f = F, color = INK) => txt(s, xr - tw(s, size, f), y, size, f, color);
+  const spacedW = (s, size, f, sp) => [...pdfText(s)].reduce((w, ch) => w + tw(ch, size, f) + sp, 0) - sp;
+  const spaced = (s, x, y, size, f, color, sp) => { for (const ch of pdfText(s)) { txt(ch, x, y, size, f, color); x += tw(ch, size, f) + sp; } };
+  const label = (s, x, y) => spaced(s.toUpperCase(), x, y, 6.8, B, MUTED, 0.8);
+  const rlabel = (s, xr, y) => label(s, xr - spacedW(s.toUpperCase(), 6.8, B, 0.8), y);
+  const rule = (y, color = LINE, th = 0.6) => page.drawLine({ start: { x: M, y }, end: { x: R, y }, thickness: th, color });
+  const wrap = (s, maxW, size, f = F) => {
+    const out = [];
+    let line = "";
+    for (const word of String(s || "").split(/\s+/).filter(Boolean)) {
+      const next = line ? line + " " + word : word;
+      if (tw(next, size, f) <= maxW) { line = next; continue; }
+      if (line) out.push(line);
+      line = word;
+      while (tw(line, size, f) > maxW && line.length > 1) { let k = line.length - 1; while (k > 1 && tw(line.slice(0, k), size, f) > maxW) k--; out.push(line.slice(0, k)); line = line.slice(k); }
+    }
+    out.push(line);
+    return out;
+  };
+  const newPage = () => {
+    page = doc.addPage([PW, H]); pages.push(page);
+    page.drawRectangle({ x: 0, y: H - 6, width: PW, height: 6, color: ACC });
+    if (pages.length === 1) return 0;
+    if (C.name) txt(C.name, M, H - 40, 10, B, INK);
+    rtxt("Stock list  ·  " + date, R, H - 40, 10, B, ACC);
+    rule(H - 52);
+    return H - 76;
+  };
+
+  // ---- header: you (left), the list (right)
+  newPage();
+  let ly = H - 50;
+  if (logo) {
+    const s = Math.min(180 / C.logoW, 56 / C.logoH);
+    const w = C.logoW * s, h = C.logoH * s;
+    page.drawImage(logo, { x: M, y: H - 36 - h, width: w, height: h });
+    ly = H - 36 - h - 20;
+    if (C.name) { txt(C.name, M, ly, 9.5, B, INK); ly -= 13; }
+  } else if (C.name) {
+    txt(C.name, M, H - 62, 18, B, INK);
+    ly = H - 82;
+  }
+  const coLines = (C.address ? C.address.split(/\n/) : []);
+  const reach = [C.email, C.phone, C.website].filter(Boolean);
+  if (reach.length) coLines.push(reach.join("  ·  "));
+  coLines.forEach((l) => { if (l.trim()) { txt(l, M, ly, 8.8, F, MUTED); ly -= 12; } });
+  const title = "STOCK LIST";
+  spaced(title, R - spacedW(title, 23, B, 3), H - 66, 23, B, ACC, 3);
+  const meta = [["Date", date], ["Part numbers", String(new Set(rows.map((r) => r.pn)).size)], ["Units", String(rows.reduce((s, r) => s + r.qty, 0))]];
+  if (W.ac) meta.push(["Aircraft", acName(W.ac)]);
+  if (W.cond) meta.push(["Condition", W.cond + " – " + COND[W.cond][1]]);
+  let my = H - 92;
+  meta.forEach(([k, v]) => { txt(k, R - 170, my, 8.8, F, MUTED); rtxt(v, R, my, 8.8, B, INK); my -= 13.5; });
+  let y = Math.min(ly, my) - 12;
+  rule(y); y -= 24;
+
+  // ---- the parts
+  const COL = { pn: M + 8, pnW: 86, d: M + 100, dW: 140, ac: M + 248, acW: 80, c: M + 336, cW: 88, q: M + 440, p: R - 8 };
+  const thead = () => {
+    page.drawRectangle({ x: M, y: y - 9, width: R - M, height: 24, color: BAND });
+    label("Part number", COL.pn, y); label("Description", COL.d, y); label("Aircraft", COL.ac, y); label("Condition", COL.c, y);
+    rlabel("Qty", COL.q, y); rlabel("Asking price", COL.p, y);
+    y -= 27;
+  };
+  thead();
+  const SZ = 8.8, LH = 11.2;
+  rows.forEach((r) => {
+    const pl = wrap(r.pn.replace(/-/g, "- "), COL.pnW, SZ, B).map((l) => l.replace(/- /g, "-"));   // a long part number breaks after a dash
+    const dl = wrap(r.desc || "–", COL.dW, SZ);
+    const al = wrap(r.ac ? acName(r.ac) : "–", COL.acW, SZ);
+    const cl = wrap(r.cond + " – " + (COND[r.cond] || COND.AR)[1], COL.cW, SZ);
+    const n = Math.max(pl.length, dl.length, al.length, cl.length);
+    const hgt = (n - 1) * LH + 20;
+    if (y - hgt < 64) { y = newPage(); thead(); }
+    pl.forEach((p, k) => txt(p, COL.pn, y - LH * k, SZ, B, INK));
+    dl.forEach((p, k) => txt(p, COL.d, y - LH * k, SZ, F, INK));
+    al.forEach((p, k) => txt(p, COL.ac, y - LH * k, SZ, F, INK));
+    cl.forEach((p, k) => txt(p, COL.c, y - LH * k, SZ, F, INK));
+    rtxt(String(r.qty), COL.q, y, SZ, B, INK);
+    if (r.sell == null) rtxt("On request", COL.p, y, SZ, F, MUTED); else rtxt(eur(r.sell), COL.p, y, SZ, B, INK);
+    y -= hgt - 13;
+    rule(y);
+    y -= 13;
+  });
+
+  // ---- footer on every page: who you are, and the page number
+  const foot = [C.name, C.email, C.phone, C.website].filter(Boolean).join("   ·   ");
+  pages.forEach((pg, i) => {
+    page = pg;
+    rule(46);
+    if (foot) wrap(foot, R - M - 90, 7.4).forEach((p, k) => txt(p, M, 33 - 10 * k, 7.4, F, MUTED));
+    rtxt("Page " + (i + 1) + " of " + pages.length, R, 33, 7.4, F, FAINT);
+  });
+  doc.setTitle("Stock list " + date);
+  if (C.name) doc.setAuthor(C.name);
+  doc.setCreator("Cockpit Parts Finder");
+  return doc.save();
+}
+async function exportStockPdf(btn) {
+  if (Backend.local && !Backend.stockPdf) { toast("Close the program and open it again first."); return; }
+  const rows = stockPdfRows();
+  if (!rows.length) { toast("Nothing to export."); return; }
+  const lab = btn.textContent;
+  btn.disabled = true; btn.textContent = "Making PDF…";
+  try {
+    const bytes = await buildStockPdf(rows);
+    const msg = await Backend.savePdf("stock", "Stock list " + today(), bytes);
+    if (msg) toast(msg);
+  } catch (err) {
+    toast(String(err && err.message).includes("load") ? "The PDF maker could not be loaded. Close the program and open it again." : "The PDF could not be made.");
+  } finally { btn.disabled = false; btn.textContent = lab; }
 }
 async function doExport(rows, sheet, name) {
   if (!rows.length) { toast("Nothing to export."); return; }
@@ -4446,7 +4583,7 @@ $("ssort").addEventListener("change", (ev) => { W.sort = ev.target.value; render
 $("chips").addEventListener("click", (ev) => { const b = ev.target.closest(".chip"); if (!b || b.disabled) return; S.cat = b.dataset.cat === S.cat ? "" : b.dataset.cat; S.shown = 60; render(); });
 $("exportview").addEventListener("click", () => doExport(exportRows(lastResults, "view", false), "Parts", "Cockpit parts"));
 $("exportviewp").addEventListener("click", () => doExport(exportRows(lastResults, "view", true), "Parts", "Cockpit parts with prices"));
-$("exportstock").addEventListener("click", () => doExport(stockRows(stockList()), "Stock", "Warehouse stock"));
+$("exportstock").addEventListener("click", (ev) => exportStockPdf(ev.currentTarget));
 $("addstock").addEventListener("click", () => openStockForm(null, null));
 let oqTimer = null;
 $("oq").addEventListener("input", () => { $("clearoq").hidden = !$("oq").value; clearTimeout(oqTimer); oqTimer = setTimeout(() => { L.q = $("oq").value; renderOrders(); }, 110); });
