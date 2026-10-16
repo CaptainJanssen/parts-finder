@@ -1087,6 +1087,7 @@ function makeAlt(a) {
 }
 function parseQuery(raw) {
   let q = " " + raw.toUpperCase().replace(/[“”"]/g, " ").replace(/\s+/g, " ").trim() + " ";
+  q = q.replace(/(\d) VU(?= )/g, "$1VU");   // Airbus panel numbers: "30 VU" is 30VU
   const clauses = [];
   const toks = q.trim().split(" ").filter(Boolean);
   // "65-45122 21" is a part number typed with a space; "3RD OCCUPANT SEAT" is not
