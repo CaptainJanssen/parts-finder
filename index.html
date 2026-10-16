@@ -4464,7 +4464,7 @@ function renderPicker() {
   const last = S.ac ?? S.lastAc;
   const card = (id, maker, type, sub, st, cls) => '<button class="pickcard' + (cls || "") + (last === id ? " last" : "") + '" type="button" data-pickac="' + esc(id) + '">' +
     (last === id ? '<span class="lastused">' + (S.ac === id ? "Selected" : "Last used") + "</span>" : "") +
-    '<span class="maker">' + esc(maker) + '</span><span class="type">' + esc(type) + '</span><span class="sub">' + esc(sub) + "</span>" +
+    '<span class="maker">' + esc(maker) + '</span><span class="type">' + esc(type) + "</span>" + (sub ? '<span class="sub">' + esc(sub) + "</span>" : "") +
     '<span class="figs"><span><b>' + st.pns.toLocaleString("en") + "</b> part numbers</span><span><b>" + st.figures.toLocaleString("en") + "</b> IPC figures</span></span></button>";
   $("pickgrid").innerHTML = ACS.map((a) => card(a.id, a.name.split(" ")[0], a.short, a.sub, a.stats, "")).join("") +
     card("", "Search everything", "All aircraft", ACS.map((a) => a.short).join(" · "), { pns: TOTAL.pns, figures: ACS.reduce((s, a) => s + a.stats.figures, 0) }, " all");
