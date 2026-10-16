@@ -617,6 +617,9 @@ table.occ tr:last-child td { border-bottom: 0; }
 .dhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .dhead b { font-size: 15px; }
 .dhead .sp { flex: 1; }
+.dhead[data-dtog] { cursor: pointer; }
+.dhead .chev { color: var(--muted); font-size: 14px; }
+.dgroup.shut .dhead { border-bottom: 0; }
 .dlhdr, .dline { display: grid; grid-template-columns: 22px minmax(130px, 1fr) minmax(0, 2.4fr) 120px 120px 124px 96px; gap: 12px; align-items: center; padding: 9px 16px; }
 .dline.pick { cursor: pointer; }
 .dline.pick:hover { background: var(--surface-2); }
@@ -2594,7 +2597,7 @@ function closeSheets() {
 /* ---------- Orders: customer orders, and what to request from the dismantling company ---------- */
 // The Orders tab is a full page like the catalogue and the warehouse.
 // L.tab: "orders" (customer orders) or "dism" (requests to the dismantling company); L.open: the expanded order; L.q: the order search
-const L = { tab: "orders", open: null, filter: "open", creating: false, delArm: null, q: "", dsel: new Set() };   // dsel: parts picked on the To dismantler tab
+const L = { tab: "orders", open: null, filter: "open", creating: false, delArm: null, q: "", dsel: new Set(), dopen: new Set() };   // dsel: parts picked on the To dismantler tab; dopen: its groups folded open ("todo:<order id>", "sent:stock")
 function listedEntries() { return [...prices.entries()].filter(([, r]) => r.listed).map(([pn, r]) => ({ e: entryOf(pn), r, pn })).filter((x) => x.e || x.pn).sort((a, b) => a.pn.localeCompare(b.pn)); }
 function acTags(pn) { return acsOf(pn).map((id) => '<span class="tag ac">' + esc(acShort(id)) + "</span>").join(""); }
 const inStock = (pn) => (stockByPn.get(pn) || {}).stock || 0;
@@ -2828,14 +2831,19 @@ function dismHtml(ro) {
     h += '<h3 class="oh3 todo" style="margin-top:8px">To request</h3><div class="dselbar">' + chk(groupState(all), 'data-dselg="all"', "Select all") + "<span>" + (L.dsel.size ? L.dsel.size + " of " + all.length + " selected" : "Select all") + "</span>" +
       (L.dsel.size ? '<button class="linkbtn2" type="button" data-dselclear>Clear</button>' : "") + "</div>";
   }
-  h += todo.map((g) => '<div class="results dgroup"><div class="dhead">' + (ro ? "" : chk(groupState(g.items), 'data-dselg="' + esc(g.key) + '"', "Select " + g.label)) + "<b>" + esc(g.label) + "</b>" + (g.sub ? '<span class="muted">' + esc(g.sub) + "</span>" : "") + '<span class="sp"></span>' +
-    '<button class="btn small" type="button" data-dexport="' + esc(g.key) + '">Export</button></div>' +
-    head(true) + g.items.map((x) => dismLine(x, ro, true, chk)).join("") + "</div>").join("");
+  // each order (and "For stock") folds open with a tap on its heading; folded it shows how many parts it has
+  const fold = (state, g) => {
+    const id = state + ":" + g.key, open = L.dopen.has(id), n = g.items.length;
+    return { open, attrs: ' data-dtog="' + esc(id) + '" role="button" tabindex="0" aria-expanded="' + open + '"', count: '<span class="muted dcount">' + n + (n === 1 ? " part" : " parts") + "</span>", chev: '<span class="chev" aria-hidden="true">' + (open ? "▴" : "▾") + "</span>" };
+  };
+  h += todo.map((g) => { const f = fold("todo", g); return '<div class="results dgroup' + (f.open ? "" : " shut") + '"><div class="dhead"' + f.attrs + ">" + (ro ? "" : chk(groupState(g.items), 'data-dselg="' + esc(g.key) + '"', "Select " + g.label)) + "<b>" + esc(g.label) + "</b>" + (g.sub ? '<span class="muted">' + esc(g.sub) + "</span>" : "") + f.count + '<span class="sp"></span>' +
+    '<button class="btn small" type="button" data-dexport="' + esc(g.key) + '">Export</button>' + f.chev + "</div>" +
+    (f.open ? head(true) + g.items.map((x) => dismLine(x, ro, true, chk)).join("") : "") + "</div>"; }).join("");
   if (!todo.length) h += '<div class="results"><div class="empty"><h3>Nothing to request</h3></div></div>';
   if (sent.length) {
-    h += '<h3 class="oh3 sent">Requested</h3>' + sent.map((g) => '<div class="results dgroup sent"><div class="dhead"><b>' + esc(g.label) + "</b>" + (g.sub ? '<span class="muted">' + esc(g.sub) + "</span>" : "") +
+    h += '<h3 class="oh3 sent">Requested</h3>' + sent.map((g) => { const f = fold("sent", g); return '<div class="results dgroup sent' + (f.open ? "" : " shut") + '"><div class="dhead"' + f.attrs + "><b>" + esc(g.label) + "</b>" + (g.sub ? '<span class="muted">' + esc(g.sub) + "</span>" : "") + f.count + '<span class="sp"></span>' + f.chev +
 "</div>" +
-      head(false) + g.items.map((x) => dismLine(x, ro, false)).join("") + "</div>").join("");
+      (f.open ? head(false) + g.items.map((x) => dismLine(x, ro, false)).join("") : "") + "</div>"; }).join("");
   }
   return h;
 }
@@ -3025,6 +3033,7 @@ function dismAdd(pn) {
   if (r.listed && r.sent) { toast(pn + " was already requested on " + dateNl(r.sent)); return false; }
   if (r.listed) { setRec(pn, { qty: (r.qty || 1) + 1 }); toast(pn + ": " + ((r.qty || 1) + 1) + " wanted"); }
   else { setRec(pn, { listed: true, qty: 1, sent: "" }); toast(pn + " added"); }
+  L.dopen.add("todo:stock");
   return true;
 }
 function orderPick(oid, pn, ac) {
@@ -3077,6 +3086,7 @@ function orderClick(t) {
     const oo = orders.get(b.dataset.oreq);
     if (!oo || !ordersReady()) return true;
     const [, n] = requestMissing(oo);
+    if (n) L.dopen.add("todo:" + oo.id);
     renderOrders();
     toast(n ? n + " part number" + (n === 1 ? "" : "s") + " added to the dismantler list" : "All parts are in stock");
     return true;
@@ -3128,6 +3138,7 @@ function orderClick(t) {
     keys.forEach((k) => (allOn ? L.dsel.delete(k) : L.dsel.add(k)));
     renderOrders(); return true;
   }
+  if ((b = q("[data-dtog]"))) { const id = b.dataset.dtog; if (L.dopen.has(id)) L.dopen.delete(id); else L.dopen.add(id); renderOrders(); if (document.activeElement === b) document.querySelector('[data-dtog="' + CSS.escape(id) + '"]')?.focus({ preventScroll: true }); return true; }
   if ((b = q("[data-dsel]")) || ((b = q("[data-dline]")) && !t.closest("button, input, a, select, textarea"))) {
     const k = b.dataset.dsel || b.dataset.dline;
     if (L.dsel.has(k)) L.dsel.delete(k); else L.dsel.add(k);
@@ -4333,6 +4344,7 @@ function toggleList(pn) {
   if (!Backend.canWrite) return;
   const r = rec(pn);
   setRec(pn, { listed: !r.listed, qty: r.listed ? 0 : (r.qty || 1), sent: "" });
+  if (!r.listed) L.dopen.add("todo:stock");
   toast(!r.listed ? pn + " added to the dismantler list" : pn + " taken off the dismantler list");
   render();
 }
@@ -4413,7 +4425,7 @@ function addMenuPick(b) {
   } else if (kind === "dism") {
     const r = rec(pn);
     if (r.listed) toggleList(pn);
-    else { setRec(pn, { listed: true, qty: q, sent: "" }); rqSet(pn, 1); toast(what + " added to the dismantler list"); render(); }
+    else { setRec(pn, { listed: true, qty: q, sent: "" }); L.dopen.add("todo:stock"); rqSet(pn, 1); toast(what + " added to the dismantler list"); render(); }
   } else if (kind === "order") {
     const o = orders.get(b.dataset.amo);
     if (o && ordersReady()) { addLine(o, pn, ac, q); rqSet(pn, 1); toast("Added " + what + " to " + orderLabel(o) + (o.customer ? " · " + o.customer : "")); }
@@ -4554,6 +4566,7 @@ document.addEventListener("keydown", (ev) => {
   if (AM.el && ev.key === "Escape") { closeAddMenu(); return; }
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches(".orow[data-otoggle]")) { ev.preventDefault(); ev.target.click(); return; }
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches(".srow[data-sgrp]")) { ev.preventDefault(); toggleGroup(ev.target); return; }
+  if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches(".dhead[data-dtog]")) { ev.preventDefault(); ev.target.click(); return; }
   if (DV.open) {
     if (ev.key === "Escape") dvClose();
     else if (ev.key === "+" || ev.key === "=" || ev.key === "-") { const r = $("dvstage").getBoundingClientRect(); dvZoomAt(r.width / 2, r.height / 2, ev.key === "-" ? 1 / 1.5 : 1.5); }
