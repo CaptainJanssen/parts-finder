@@ -301,6 +301,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .srow .c-txt { overflow-wrap: anywhere; font-size: 14px; }
 .srow .c-txt small { display: block; color: var(--muted); font-size: 12px; }
 @media (hover: hover) { .srow .c-part:hover .pn { color: var(--focus); } .srow .c-part:hover .desc { text-decoration: underline; text-underline-offset: 3px; } }
+/* the same part number more than once: one row with the total, and under it each unit when opened */
+.srow .ml, .srow .mli { display: none; }
+.c-conds { display: flex; flex-wrap: wrap; gap: 4px; }
+.c-grpst { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.c-grpst .sts { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.c-grpst .chev { margin-left: auto; color: var(--muted); font-size: 13px; }
+.srow.grp.open { background: var(--surface-2); border-bottom-color: transparent; }
+.srow.sub { background: color-mix(in srgb, var(--surface-2) 55%, var(--surface)); padding-block: 8px; box-shadow: inset 3px 0 0 color-mix(in srgb, var(--focus) 50%, transparent); }
+.srow.sub .c-info { padding-left: 14px; }
+.srow.sub .c-info small { font-size: 12.5px; }
 .cond { display: inline-flex; align-items: center; font-family: var(--f-mono); font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 4px; border: 1px solid; white-space: nowrap; }
 .cond.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: var(--good-bg); }
 .cond.ar { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); background: var(--amber-bg); }
@@ -325,6 +335,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .srow > :nth-child(1) { grid-area: part; } .srow > :nth-child(2) { grid-area: cond; } .srow > :nth-child(3) { grid-area: qty; }
   .srow > :nth-child(4) { grid-area: serial; } .srow > :nth-child(5) { grid-area: loc; text-align: right; }
   .srow > :nth-child(6) { grid-area: cost; text-align: left; } .srow > :nth-child(7) { grid-area: ask; } .srow > :nth-child(8) { grid-area: status; }
+  .srow > .c-money { align-self: start; }
+  .srow .ml { display: block; font-size: 11px; color: var(--muted); font-family: var(--f-display); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 1px; }
+  .srow .mli { display: inline; font-size: 11px; color: var(--muted); font-family: var(--f-display); letter-spacing: .1em; margin-right: 6px; }
+  .c-grpst .sts { flex-direction: row; flex-wrap: wrap; }
+  .srow.sub { grid-template-areas: "serial cond" "loc qty" "part part" "cost ask" "status status"; }
+  .srow.sub > :nth-child(2) { justify-self: end; } .srow.sub > :nth-child(5) { text-align: left; }
+  .srow.sub > .c-info:empty, .srow.sub .c-qty.one { display: none; }
+  .srow.sub .c-info { padding-left: 0; }
+  .c-grpst .chev { font-size: 16px; padding-right: 2px; }
   .plate h1 { font-size: 16px; letter-spacing: .12em; }
 }
 
@@ -1126,7 +1145,7 @@ function scoreEntry(e, clauses) {
 /* ---------- State ---------- */
 // ac: null until an aircraft is picked on the start screen, "" for all aircraft, else the aircraft id
 const S = { view: "pick", ac: null, lastAc: null, q: "", cat: "", sec: "", hideHw: true, priced: false, inStock: false, sort: "rel", shown: 60, sel: null };
-const W = { q: "", status: "active", ac: "", cond: "", loc: "", sort: "recent", shown: 100, soldOpen: false };
+const W = { q: "", status: "active", ac: "", cond: "", loc: "", sort: "recent", shown: 100, soldOpen: false, open: new Set() };   // open: part numbers whose units are shown
 try { W.soldOpen = localStorage.getItem("pf-sold-open") === "1"; } catch (_) {}
 try {
   const saved = JSON.parse(localStorage.getItem("ipc-finder-view") || "{}");
@@ -1803,20 +1822,69 @@ function stockList() {
   arr.sort(sorters[W.sort] || sorters.recent);
   return arr;
 }
-function srowHtml(it) {
-  const e = entryOf(it.pn, it.ac);
+const DASH = '<span style="color:var(--muted)">–</span>';
+// a money cell; on phones (no column headings) it carries its own label
+const mcell = (label, html) => '<div class="c-money"><span class="ml">' + label + "</span>" + html + "</div>";
+// one stock line; unit = one of several units of the same part number, shown under that part's row
+function srowHtml(it, unit) {
+  const e = unit ? null : entryOf(it.pn, it.ac);
   const sub = [it.from ? "from " + esc(it.from) : "", it.received ? "received " + esc(dateNl(it.received)) : "", it.condNote ? esc(it.condNote) : ""].filter(Boolean).join(" · ");
   const sold = it.status === "sold";
-  return '<div class="srow" data-sid="' + esc(it.id) + '">' +
+  return '<div class="srow' + (unit ? " sub" : "") + '" data-sid="' + esc(it.id) + '">' +
     // the part number and description open the part information (as in the catalogue); the rest of the row edits the stock item
-    '<div class="c-txt' + (e ? ' c-part" title="Part information' : "") + '">' + (it.ac ? '<span class="tag ac">' + esc(acShort(it.ac)) + "</span>" : "") + '<span class="pn">' + esc(it.pn) + '</span><div class="desc" style="font-size:14px">' + esc(it.desc || (e ? e.d : "")) + "</div>" + (sub ? '<small>' + sub + "</small>" : "") + "</div>" +
+    (unit ? '<div class="c-txt c-info">' + (sub ? "<small>" + sub + "</small>" : "") + "</div>"
+      : '<div class="c-txt' + (e ? ' c-part" title="Part information' : "") + '">' + (it.ac ? '<span class="tag ac">' + esc(acShort(it.ac)) + "</span>" : "") + '<span class="pn">' + esc(it.pn) + '</span><div class="desc" style="font-size:14px">' + esc(it.desc || (e ? e.d : "")) + "</div>" + (sub ? '<small>' + sub + "</small>" : "") + "</div>") +
     "<div>" + condBadge(it.cond) + (it.grade ? '<span class="grade">grade ' + esc(it.grade) + "</span>" : "") + "</div>" +
-    '<div class="c-qty">' + esc(it.qty) + "</div>" +
-    '<div class="c-txt mono" style="font-size:13px">' + (esc(it.serial) || '<span style="color:var(--muted)">–</span>') + "</div>" +
-    '<div class="c-txt">' + (esc(it.loc) || '<span style="color:var(--muted)">–</span>') + "</div>" +
-    '<div class="c-money">' + (it.buy != null ? esc(EUR.format(it.buy)) : "–") + (it.qty > 1 && it.buy != null ? "<small>× " + it.qty + "</small>" : "") + "</div>" +
-    '<div class="c-money">' + (sold ? (it.soldPrice != null ? esc(EUR.format(it.soldPrice)) + "<small>sold</small>" : "–") : (it.sell != null ? esc(EUR.format(it.sell)) : "–")) + "</div>" +
+    '<div class="c-qty' + (unit && it.qty === 1 ? " one" : "") + '">' + (unit && it.qty > 1 ? '<span class="mli">×</span>' : "") + esc(it.qty) + "</div>" +
+    '<div class="c-txt mono" style="font-size:13px">' + (it.serial ? '<span class="mli">SN</span>' + esc(it.serial) : DASH) + "</div>" +
+    '<div class="c-txt">' + (esc(it.loc) || DASH) + "</div>" +
+    mcell("Cost", (it.buy != null ? esc(EUR.format(it.buy)) : "–") + (it.qty > 1 && it.buy != null ? "<small>× " + it.qty + "</small>" : "")) +
+    mcell(sold ? "Sold for" : "Asking", sold ? (it.soldPrice != null ? esc(EUR.format(it.soldPrice)) + "<small>sold</small>" : "–") : (it.sell != null ? esc(EUR.format(it.sell)) : "–")) +
     "<div>" + stSelect(it) + (sold && it.soldDate ? '<div class="ctx">' + esc(dateNl(it.soldDate)) + "</div>" : "") + "</div></div>";
+}
+// the same part number more than once (other serial numbers, other prices): one row with the total; a tap shows each unit
+function stockGroups(list) {
+  const by = new Map();
+  for (const it of list) { const g = by.get(it.pn); if (g) g.items.push(it); else by.set(it.pn, { pn: it.pn, items: [it] }); }
+  const gs = [...by.values()];
+  if (W.sort === "value") { const v = (g) => g.items.reduce((s, it) => s + (it.sell ?? 0) * it.qty, 0); gs.sort((a, b) => v(b) - v(a)); }
+  // by serial number; units without one last
+  const nat = (a, b) => (!a - !b) || a.localeCompare(b, "en", { numeric: true });
+  for (const g of gs) if (g.items.length > 1) g.items.sort((a, b) => nat(a.serial, b.serial) || (a.received || "").localeCompare(b.received || ""));
+  return gs;
+}
+const fewOf = (arr, n) => (arr.length <= n ? arr.join(", ") : arr.slice(0, n - 1).join(", ") + " +" + (arr.length - n + 1));
+// lowest price, and the highest under it when the units differ
+function rangeHtml(vals) {
+  const v = vals.filter((x) => x != null);
+  if (!v.length) return "–";
+  const lo = Math.min(...v), hi = Math.max(...v);
+  return esc(EUR.format(lo)) + (hi !== lo ? "<small>to " + esc(EUR.format(hi)) + "</small>" : "");
+}
+function sgrpHtml(g) {
+  const its = g.items, first = its[0];
+  const open = W.open.has(g.pn);
+  const e = entryOf(first.pn, first.ac);
+  const acs = [...new Set(its.map((it) => it.ac).filter(Boolean))];
+  const units = (f) => its.filter(f).reduce((s, it) => s + it.qty, 0);
+  const sts = STATUSES.filter(([v]) => its.some((it) => it.status === v));
+  const serials = its.map((it) => it.serial).filter(Boolean);
+  const locs = [...new Set(its.map((it) => it.loc).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+  return '<div class="srow grp' + (open ? " open" : "") + '" data-sgrp="' + esc(g.pn) + '" data-ac="' + esc(first.ac || "") + '" role="button" tabindex="0" aria-expanded="' + open + '">' +
+    '<div class="c-txt' + (e ? ' c-part" title="Part information' : "") + '">' + acs.map((ac) => '<span class="tag ac">' + esc(acShort(ac)) + "</span>").join("") + '<span class="pn">' + esc(g.pn) + '</span><div class="desc" style="font-size:14px">' + esc(first.desc || (e ? e.d : "")) + "</div></div>" +
+    '<div class="c-conds">' + CONDS.filter((c) => its.some((it) => it.cond === c[0])).map((c) => condBadge(c[0])).join("") + "</div>" +
+    '<div class="c-qty">' + units(() => true) + "</div>" +
+    '<div class="c-txt mono" style="font-size:13px">' + (serials.length ? '<span class="mli">SN</span>' + esc(fewOf(serials, 3)) : DASH) + "</div>" +
+    '<div class="c-txt">' + (locs.length ? esc(fewOf(locs, 3)) : DASH) + "</div>" +
+    mcell("Cost", rangeHtml(its.map((it) => it.buy))) + mcell("Asking", rangeHtml(its.map((it) => it.sell))) +
+    '<div class="c-grpst"><span class="sts">' + sts.map(([v, l]) => '<span class="status ' + v + '">' + (sts.length > 1 ? units((it) => it.status === v) + " " + l.toLowerCase() : l) + "</span>").join("") + '</span><span class="chev" aria-hidden="true">' + (open ? "▴" : "▾") + "</span></div></div>" +
+    (open ? its.map((it) => srowHtml(it, true)).join("") : "");
+}
+function toggleGroup(row) {
+  const pn = row.dataset.sgrp, kb = document.activeElement === row;
+  if (W.open.has(pn)) W.open.delete(pn); else W.open.add(pn);
+  renderStock();
+  if (kb) document.querySelector('#srows [data-sgrp="' + CSS.escape(pn) + '"]')?.focus({ preventScroll: true });
 }
 // the status can be changed right in the list: In stock, Reserved, Sold
 function stSelect(it) {
@@ -1893,14 +1961,14 @@ function renderStock() {
   const sloc = $("sloc");
   const curLoc = W.loc;
   sloc.innerHTML = '<option value="">Any</option>' + locs.map((l) => '<option value="' + esc(l) + '"' + (l === curLoc ? " selected" : "") + ">" + esc(l) + "</option>").join("");
-  const list = stockList();
+  const list = stockGroups(stockList());
   $("addstock").disabled = !Backend.canWrite;
   if (!active.length) {
     $("srows").innerHTML = '<div class="empty"><h3>' + (all.length ? "Nothing in stock" : "No stock yet") + "</h3></div>";
   } else if (!list.length) {
     $("srows").innerHTML = '<div class="empty"><h3>Nothing matches</h3></div>';
   } else {
-    $("srows").innerHTML = list.slice(0, W.shown).map(srowHtml).join("");
+    $("srows").innerHTML = list.slice(0, W.shown).map((g) => (g.items.length > 1 ? sgrpHtml(g) : srowHtml(g.items[0]))).join("");
   }
   const more = $("smore");
   if (list.length > W.shown) { more.hidden = false; more.innerHTML = "Showing " + W.shown + " of " + list.length + ' <button class="btn small" type="button" id="smoreb">Show all</button>'; }
@@ -4389,6 +4457,7 @@ document.addEventListener("keydown", (ev) => {
   if (SC.open) { if (ev.key === "Escape") closeScanner(); return; }
   if (AM.el && ev.key === "Escape") { closeAddMenu(); return; }
   if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches(".orow[data-otoggle]")) { ev.preventDefault(); ev.target.click(); return; }
+  if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches(".srow[data-sgrp]")) { ev.preventDefault(); toggleGroup(ev.target); return; }
   if (DV.open) {
     if (ev.key === "Escape") dvClose();
     else if (ev.key === "+" || ev.key === "=" || ev.key === "-") { const r = $("dvstage").getBoundingClientRect(); dvZoomAt(r.width / 2, r.height / 2, ev.key === "-" ? 1 / 1.5 : 1.5); }
@@ -4451,7 +4520,14 @@ document.addEventListener("click", (ev) => {
   }
   if (t.closest("select, input, textarea")) { if (t.closest("[data-sid]")) return; }
   const sp = t.closest(".srow .c-part, .solrow .c-part");
-  if (sp) { const it = stock.get(sp.closest("[data-sid]").dataset.sid); const i = it ? entryIdx(it.pn, it.ac) : null; if (i != null) { openDetail(i); return; } }
+  if (sp) {
+    const h = sp.closest("[data-sid], [data-sgrp]");
+    const it = h.dataset.sgrp != null ? { pn: h.dataset.sgrp, ac: h.dataset.ac } : stock.get(h.dataset.sid);
+    const i = it ? entryIdx(it.pn, it.ac) : null;
+    if (i != null) { openDetail(i); return; }
+  }
+  const sgp = t.closest("[data-sgrp]");
+  if (sgp) { toggleGroup(sgp); return; }
   const su = t.closest("[data-sid]");
   if (su && !t.closest("input, select, textarea")) { const it = stock.get(su.dataset.sid); if (it) openStockForm(it, su.classList.contains("unitrow") ? S.sel : null); return; }
   if (t.closest("[data-close]")) { const back = SF && SF.returnTo; closeSheets(); if (back != null) openDetail(back); return; }
