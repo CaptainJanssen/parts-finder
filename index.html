@@ -1306,7 +1306,8 @@ const Backend = (() => {
         (err ? '<p class="booterr">' + esc(err) + "</p>" : "") + '<div class="listactions"><button class="btn primary" type="submit" id="cl-go">Log in</button></div></form></div>';
     }
     return '<div class="sec" id="cl-sec"><h4>Online database</h4><p class="note">Syncs by itself with the PC program.</p><p class="synclast" id="cl-status">' + esc(B.statusHtml()) + "</p>" +
-      '<div class="listactions"><button class="btn primary" type="button" id="cl-sync">Sync now</button></div></div>';
+      '<div class="listactions"><button class="btn primary" type="button" id="cl-sync">Sync now</button></div>' +
+      '<p class="synclast" id="cl-figs">' + esc(B.figText()) + "</p></div>";
   };
   B.onClick = (t) => {
     if (t.id === "cl-sync") { t.disabled = true; t.textContent = "Syncing…"; syncNow().then(() => { const b = $("cl-sync"); if (b) { b.disabled = false; b.textContent = "Sync now"; } toast(problem ? "Not synced: " + B.statusHtml() : "Synced"); }); return true; }
@@ -1386,9 +1387,105 @@ const Backend = (() => {
       return r === "cancelled" ? "" : "CSV file made.";
     }
   };
-  // IPC drawings: from your database's private folder, kept on this device once seen
+  /* ---------- IPC drawings kept on this device, so they all work offline ---------- */
+  // Every drawing file the PC program put online (figures/*.json and the *.bin packs, about 120 MB) is copied whole
+  // into the cache "pf-figs". A file is stored under its version, so a new set from the PC is fetched next to the
+  // old one; the app keeps using the set it started with and takes the new one from the next start.
+  const FIG = { map: null, next: null, state: "", done: 0, total: 0, bytes: 0, running: null, toldDone: false, used: false };
+  const figKey = (name, tag) => new Request(location.origin + "/__figs/" + encodeURIComponent(tag) + "/" + name);
+  async function figList() {
+    const out = [];
+    for (let offset = 0; offset < 10000; offset += 1000) {
+      const page = await C.rest("POST", "/storage/v1/object/list/app", { prefix: "figures", limit: 1000, offset, sortBy: { column: "name", order: "asc" } });
+      (page || []).forEach((o) => {
+        if (!o || !o.id || !/^[A-Za-z0-9_-]+\.(?:bin|json)$/.test(o.name || "")) return;
+        const md = o.metadata || {};
+        out.push({ name: o.name, size: md.size || md.contentLength || 0, tag: String(md.eTag || o.updated_at || "").replace(/"/g, "") + "-" + (md.size || 0) });
+      });
+      if (!page || page.length < 1000) break;
+    }
+    return out;
+  }
+  function figStatus() {
+    const el = $("cl-figs");
+    if (el) el.textContent = B.figText();
+    if (FIG.state === "ok" && FIG.toldDone) { FIG.toldDone = false; toast("All IPC drawings are saved on this device"); }
+  }
+  B.figText = () => {
+    const mb = (b) => Math.round(b / 1e6) + " MB";
+    if (FIG.state === "busy") return "Saving the IPC drawings for offline use: " + FIG.done + " of " + FIG.total + " files";
+    if (FIG.state === "ok" || (FIG.map && Object.keys(FIG.map).length)) return "All IPC drawings are saved on this device (" + mb(FIG.bytes) + "): they work offline.";
+    if (FIG.state === "error") return "The IPC drawings could not all be saved yet; it goes on when there is internet.";
+    return "The IPC drawings are saved on this device when there is internet.";
+  };
+  async function figSync() {
+    if (FIG.running) return FIG.running;
+    FIG.running = (async () => {
+      try {
+        if (!navigator.onLine || !C.session || !("caches" in window)) return;
+        const files = await figList();
+        if (!files.length) return;
+        const cur = FIG.next || FIG.map || {};
+        const want = Object.fromEntries(files.map((f) => [f.name, f.tag]));
+        const sizes = files.reduce((n, f) => n + f.size, 0);
+        const cache = await caches.open("pf-figs");
+        if (files.every((f) => cur[f.name] === f.tag) && Object.keys(cur).length === files.length) { FIG.state = "ok"; FIG.bytes = sizes; return; }
+        const first = !FIG.map || !Object.keys(FIG.map).length;
+        FIG.state = "busy"; FIG.total = files.length; FIG.done = 0; figStatus();
+        // packs first, the indexes that point into them last
+        for (const f of files.slice().sort((a, b) => a.name.endsWith(".json") - b.name.endsWith(".json"))) {
+          const key = figKey(f.name, f.tag);
+          if (!(await cache.match(key))) {
+            const r = await C.file("figures/" + f.name);
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const body = await r.arrayBuffer();
+            await cache.put(key, new Response(body, { headers: { "Content-Type": f.name.endsWith(".json") ? "application/json" : "application/octet-stream" } }));
+          }
+          FIG.done++; figStatus();
+        }
+        await C.put("kv", { files: want, bytes: sizes, at: now() }, "figs");
+        FIG.bytes = sizes; FIG.state = "ok"; FIG.toldDone = first;
+        // used at once when no drawing was opened yet; otherwise from the next start (the open drawings stay right)
+        if (first || !FIG.used) FIG.map = want; else FIG.next = want;
+        if (first) caches.delete("pf-figures").catch(() => {});   // the sheets kept one by one before
+      } catch (_) { FIG.state = "error"; }
+      finally { FIG.running = null; figStatus(); }
+    })();
+    return FIG.running;
+  }
+  // at the start: the set saved last time, and away with files no set uses any more
+  async function figStart() {
+    try {
+      const saved = await C.get("kv", "figs");
+      FIG.map = (saved && saved.files) || null; FIG.bytes = (saved && saved.bytes) || 0;
+      if (FIG.map && "caches" in window) {
+        const cache = await caches.open("pf-figs");
+        const keep = new Set(Object.entries(FIG.map).map(([n, t]) => figKey(n, t).url));
+        for (const k of await cache.keys()) if (!keep.has(k.url)) cache.delete(k);
+      }
+    } catch (_) { FIG.map = null; }
+    setTimeout(() => figSync(), 6000);
+    window.addEventListener("online", () => setTimeout(() => figSync(), 3000));
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && FIG.state !== "ok") figSync(); });
+  }
+
+  // IPC drawings: whole files from this device; otherwise from your database's private folder (kept once seen)
   B.figFetch = async (path, opts) => {
     const range = opts && opts.headers && opts.headers.Range;
+    const name = path.replace(/^figures\//, "");
+    FIG.used = true;
+    const tag = FIG.map && FIG.map[name];
+    if (tag && "caches" in window) {
+      try {
+        const hit = await (await caches.open("pf-figs")).match(figKey(name, tag));
+        if (hit) {
+          const m = range && /bytes=(\d+)-(\d*)/.exec(range);
+          if (!m) return hit;
+          const buf = await hit.arrayBuffer();
+          return new Response(buf.slice(+m[1], m[2] ? +m[2] + 1 : buf.byteLength), { status: 206, headers: { "Content-Type": "application/octet-stream" } });
+        }
+      } catch (_) {}
+    }
     const key = new Request(location.origin + "/__figs/" + path + (range ? "?r=" + encodeURIComponent(range) : ""));
     let cache = null;
     try {
@@ -1405,6 +1502,7 @@ const Backend = (() => {
     return r;
   };
   B.pdfLink = () => null;
+  B.onSyncOpen = () => { if (FIG.state !== "ok" && FIG.state !== "busy") figSync(); };
 
   B.init = async (h) => {
     hh = h;
@@ -1418,6 +1516,7 @@ const Backend = (() => {
     B.state = "live";
     status();
     syncNow();
+    figStart();
     setInterval(() => { if (document.visibilityState === "visible") syncNow(); }, 20000);
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });
     window.addEventListener("online", () => syncNow());
