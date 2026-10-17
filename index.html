@@ -240,6 +240,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .desc { font-weight: 700; overflow-wrap: anywhere; }
 .ctx { color: var(--muted); font-size: 13px; margin-top: 2px; overflow-wrap: anywhere; }
 .fits { font-size: 13px; margin-top: 3px; overflow-wrap: anywhere; }
+.about { color: var(--muted); font-size: 13px; line-height: 1.35; margin-top: 2px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.aboutbox { margin-top: 14px; }
+.aboutbox .abouttext { margin: 0; font-size: 15px; line-height: 1.45; }
+.aboutbox .abouttext.none { color: var(--muted); }
+.aboutbox .aboutmeta { display: flex; gap: 12px; align-items: center; margin-top: 6px; font-size: 13px; color: var(--muted); }
+.aboutbox textarea { width: 100%; font: inherit; font-size: 15px; }
+.aboutbox .aboutbtns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
 .fits .fitl { font-family: var(--f-display); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-right: 6px; }
 .listedas { margin-top: 2px; font-size: 12.5px; }
 .listedas span { color: var(--muted); }
@@ -969,6 +976,7 @@ function figLabel(ref) {
 function fixO(s) { return s.replace(/([A-Z])0(?=[A-Z])/g, "$1O").replace(/(^|[^A-Z0-9])0(?=[A-Z]{2})/g, "$1O"); }
 function effLabel(e) { return (e || "").split(", ").filter(Boolean).map((x) => x.slice(0, 3) + "–" + x.slice(3)).join(", "); }
 const TIER1 = /^(MODULE ASSY|PANEL ASSY|PANEL|PANEL FRAME|INDICATOR|INDICATOR ASSY|CLOCK|ANNUNCIATOR|ANNUNCIATOR ASSY|DISPLAY|DISPLAY ASSY|UNIT ASSY|CONTROL STAND ASSY|CONSOLE ASSY|TIMER ASSY|SEAT ASSY|GLARESHIELD ASSY|COMPASS|CONTROL UNIT|CONTROL PANEL|FCU|RMP|ACP|ECP|MCDU|DCDU|DU|ISIS|SDU|EFIS CP|CP|SIDESTICK|SIDE STICK|HANDWHEEL|VOLTMETER|CHRONOMETER|SEAT|FIRE PANEL|DDRMI|CDU|MDDU|PEDAL|PEDAL ASSY|TILLER ASSY|CONTROLLER ASSY|CONTROL UNIT ASSY|ALTIMETER|TRANSMITTER UNIT|PRINTER|WINDSHIELD|WINDOW ASSY)$/;
+const LINING_PAR = /FLOOR|CEILING|\bCLG\b|LINING|PROTECTIVE|STOWAGE|COAT ROOM|CLOSET|CUPHOLDER|SIDEWALL|DRIPSHIELD/;
 // 1 complete units, 2 switches and light assemblies, 3 panel parts (lightplates, bezels, caps, placards), 4 structure and wiring, 5 installation drawings, 6 hardware
 function tierOf(e) {
   const b = e.d.split(/[-,(]/)[0].trim();
@@ -976,6 +984,8 @@ function tierOf(e) {
   if (e.c === "install" || /\bINSTL\b/.test(b) || e.p.startsWith("M0DREF")) return 5;
   // a "PANEL" is a complete control panel only where the IPC installs it directly (PANEL-ADF CONT);
   // inside another assembly it is that assembly's face plate (PANEL-FRONT, PANEL-LT A12)
+  // a panel in a floor, ceiling or lining installation is a lining panel
+  if ((b === "PANEL" || b === "PANEL ASSY") && e.o.every((o) => LINING_PAR.test((PARENTS[o[2]] || "") + " | " + FIGS[o[0]][1]))) return 3;
   if (b === "PANEL") return e.o.some((o) => { const par = PARENTS[o[2]] || ""; return !par || /\bINSTL\b/.test(par); }) ? 1 : 3;
   if (TIER1.test(b) || e.c === "instr") return 1;
   if (e.c === "control" || /^(LIGHT ASSY|LIGHT|SWITCH|SWITCH ASSY|DIMMER)/.test(b)) return 2;
@@ -1011,7 +1021,7 @@ P.forEach((e, i) => {
   e.secs = new Set([...secs].map((x) => e.ac + "|" + x));
   secs.forEach((x) => figTitles.add(secTitle(e.ac, x)));   // "Overhead Panel", "Center Pedestal" help Airbus searches
   e.mainParent = [...parentNames.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "";
-  e.ctxU = fixO([...quals, ...parentNames.keys(), ...figTitles, ...(e.f || []), ...(e.pl || []), ...(e.pos || []), ...(e.e || []), ...(e.mod || []), ...(e.u || [])].join(" | "));
+  e.ctxU = fixO([...quals, ...parentNames.keys(), ...figTitles, (e.ab || "").toUpperCase(), ...(e.f || []), ...(e.pl || []), ...(e.pos || []), ...(e.e || []), ...(e.mod || []), ...(e.u || [])].join(" | "));
 });
 const CATORDER = Object.fromEntries(DATA.cats.map((c, i) => [c[0], i]));
 const DEFAULT_ORDER = P.map((e) => e.idx).sort((a, b) => P[a].tier - P[b].tier || P[a].generic - P[b].generic || CATORDER[P[a].c] - CATORDER[P[b].c] || P[a].d.localeCompare(P[b].d));
@@ -1210,7 +1220,7 @@ const Backend = (() => {
   const tombAt = (key) => (hh && hh.tombAt && hh.tombAt(key)) || now();
   const body = (o) => { const { id, ...rest } = o; return rest; };
   B.savePrice = (pn, r) => (r
-    ? put("price", pn, { buy: r.buy ?? null, sell: r.sell ?? null, note: r.note || "", qty: r.qty || 0, listed: !!r.listed, sent: r.sent || "" }, false, r.at || now())
+    ? put("price", pn, { buy: r.buy ?? null, sell: r.sell ?? null, note: r.note || "", about: r.about || "", qty: r.qty || 0, listed: !!r.listed, sent: r.sent || "" }, false, r.at || now())
     : put("price", pn, null, true, tombAt("p:" + pn)));
   B.saveStock = (it) => put("stock", it.id, body(it), false, it.updated || now());
   B.deleteStock = (id) => put("stock", id, null, true, tombAt("s:" + id));
@@ -1536,7 +1546,7 @@ function parseMoney(v) {
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN;
 }
 function money(n) { return n == null || n === "" ? "" : NUM.format(n); }
-function normPrice(v) { return { buy: v.buy ?? null, sell: v.sell ?? null, note: v.note || "", qty: v.qty || 0, listed: !!v.listed, sent: v.listed && /^\d{4}-\d\d-\d\d$/.test(v.sent || "") ? v.sent : "", at: v.at || v.updatedAt || "" }; }
+function normPrice(v) { return { buy: v.buy ?? null, sell: v.sell ?? null, note: v.note || "", about: String(v.about || "").slice(0, 300), qty: v.qty || 0, listed: !!v.listed, sent: v.listed && /^\d{4}-\d\d-\d\d$/.test(v.sent || "") ? v.sent : "", at: v.at || v.updatedAt || "" }; }
 const ORDER_STATUS = [["open", "Open"], ["waiting", "Waiting for parts"], ["ready", "Ready to ship"], ["shipped", "Shipped"], ["cancelled", "Cancelled"]];
 const OSTAT = Object.fromEntries(ORDER_STATUS);
 function normOrder(v) {
@@ -1565,7 +1575,7 @@ function normStock(v) {
     created: v.created || "", updated: v.updated || "",
   };
 }
-function isEmptyRec(r) { return r.buy == null && r.sell == null && !r.note && !r.listed; }
+function isEmptyRec(r) { return r.buy == null && r.sell == null && !r.note && !r.listed && !r.about; }
 function nowIso() { return new Date().toISOString(); }
 function today() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 function dateNl(iso) { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(iso || ""); return m ? m[3] + "-" + m[2] + "-" + m[1] : ""; }
@@ -1766,12 +1776,38 @@ function ctxLine(e) {
 }
 // one part number fitted at several seats (CAPT, F/O, observer) under different IPC names
 function fitsHtml(e) { return e.ps ? '<div class="fits"><span class="fitl">Fits</span>' + e.ps.map(esc).join(" · ") + "</div>" : ""; }
+// what the part is and where it sits: your own text, else the finder's
+function aboutText(e, r) { return ((r || rec(e.p)).about || e.ab || "").trim(); }
+function aboutLine(e, r) { const t = aboutText(e, r); return t ? '<div class="about">' + esc(t) + "</div>" : ""; }
+let aboutEdit = null, aboutDraft = "";   // the part whose description is being edited, and the text typed so far
+function aboutHtml(e) {
+  const own = (rec(e.p).about || "").trim();
+  const canEdit = Backend.canWrite && Backend.about !== false;
+  if (aboutEdit === e.p && canEdit) {
+    return '<div class="aboutbox"><label class="field" for="d-about">Description<textarea id="d-about" rows="3" maxlength="300">' + esc(aboutDraft) + "</textarea></label>" +
+      '<div class="aboutbtns"><button class="btn primary small" type="button" data-aboutsave>Save</button><button class="btn small" type="button" data-aboutcancel>Cancel</button>' +
+      (own && e.ab ? '<button class="linkbtn2" type="button" data-aboutreset>Use the finder\'s text again</button>' : "") + "</div></div>";
+  }
+  const t = own || e.ab || "";
+  if (!t && !canEdit) return "";
+  return '<div class="aboutbox">' + (t ? '<p class="abouttext">' + esc(t) + "</p>" : '<p class="abouttext none">No description yet.</p>') +
+    '<div class="aboutmeta">' + (own ? "<span>Your description</span>" : "") +
+    (canEdit ? '<button class="linkbtn2" type="button" data-aboutedit>' + (t ? "Edit" : "Add a description") + "</button>" : "") + "</div></div>";
+}
+function aboutSave(e, text) {
+  let v = (text || "").replace(/\s+/g, " ").trim().slice(0, 300);
+  if (v === (e.ab || "")) v = "";
+  setRec(e.p, { about: v });
+  aboutEdit = null;
+  renderDetail(e, true);
+  render();
+}
 // no prices in the catalogue: they live in the warehouse and the orders (and show in the part details)
 function rowHtml(e) {
   const r = rec(e.p);
   return '<div class="row' + (S.sel === e.idx ? " sel" : "") + '" data-i="' + e.idx + '">' +
     '<div class="c-pn"><span class="pn">' + esc(e.p) + '</span><button class="copy" type="button" data-copy="' + esc(e.p) + '" aria-label="Copy ' + esc(e.p) + '" title="Copy part number">' + COPY_SVG + "</button></div>" +
-    '<div class="c-desc"><div class="desc">' + esc(e.d) + "</div>" + fitsHtml(e) + '<div class="ctx">' + ctxLine(e) + "</div></div>" +
+    '<div class="c-desc"><div class="desc">' + esc(e.d) + "</div>" + aboutLine(e, r) + fitsHtml(e) + '<div class="ctx">' + ctxLine(e) + "</div></div>" +
     '<div class="c-act">' + rqHtml(e.p) + '<button class="addlist' + (r.listed ? " on" : "") + '" type="button" data-addmenu="' + esc(e.p) + '" data-ac="' + esc(e.ac) + '" aria-haspopup="menu"' + (Backend.canWrite ? "" : " disabled") + ">" + (r.listed ? "✓ Listed" : "+ Add") + "</button></div></div>";
 }
 // how many to add with "+ Add" (per part, back to 1 once added)
@@ -2449,7 +2485,7 @@ function renderDetail(e, keepScroll) {
     kv("Notes", (e.nt || []).map(esc).join("<br>")) +
     kv("Used on", (e.u || []).map((x) => pnChip(x.split(" ")[0], e.ac)).join(" "));
   sh.innerHTML = '<header><div style="min-width:0"><div class="eyebrow">' + esc(acName(e.ac) + " · " + (e.tier === 1 ? "Complete unit · " + CAT[e.c] : CAT[e.c])) + '</div><div class="bigpn">' + esc(e.p) + '<button class="copy" type="button" data-copy="' + esc(e.p) + '" aria-label="Copy part number">' + COPY_SVG + '</button></div><div class="bigdesc">' + esc(e.d) + "</div>" + fitsHtml(e) + "</div>" +
-    '<button class="xbtn" type="button" data-close aria-label="Close">×</button></header><div class="body">' +
+    '<button class="xbtn" type="button" data-close aria-label="Close">×</button></header><div class="body">' + aboutHtml(e) +
     (e.p.startsWith("M0DREF") ? '<div class="banner" style="margin-top:14px">M0DREF numbers are Boeing drawing references for an installation. For buying, use the part numbers listed under “Contains”.</div>' : "") +
     (e.c === "install" && e.ac === "A330" ? '<div class="banner" style="margin-top:14px">This is an Airbus installation drawing number. For buying, use the part numbers listed under “Contains”.</div>' : "") +
     drawPlaceholder(e) +
@@ -2684,6 +2720,7 @@ function dvOpen() { if (S.sel == null || !DRW.sel) return; dvEl().hidden = false
 function dvClose() { const el = $("drawview"); if (el) el.hidden = true; DV.open = false; DV.pts.clear(); if (S.sel != null && !$("detail").hidden) fillDrawing(P[S.sel]); }
 
 function openDetail(i) {
+  if (aboutEdit !== P[i].p) aboutEdit = null;
   S.sel = i;
   $("stocksheet").hidden = true; $("msgsheet").hidden = true;
   renderDetail(P[i]);
@@ -2697,7 +2734,7 @@ function closeSheets() {
   draftNow();   // whatever was typed in an open form is kept
   if (DV.open) { $("drawview").hidden = true; DV.open = false; }
   ["detail", "stocksheet", "msgsheet", "pickersheet", "scrim"].forEach((id) => { $(id).hidden = true; });
-  S.sel = null; SF = null;
+  S.sel = null; SF = null; aboutEdit = null;
   document.querySelectorAll(".row.sel").forEach((r) => r.classList.remove("sel"));
   if (renderPending) { renderPending = false; render(); renderStock(); }
 }
@@ -4712,6 +4749,16 @@ document.addEventListener("click", (ev) => {
   if (sw) { chooseAircraft(sw.dataset.switch); return; }
   const lb = t.closest("[data-list]");
   if (lb) { ev.stopPropagation(); toggleList(lb.dataset.list); return; }
+  if (t.closest("[data-aboutedit]") && S.sel != null) {
+    const e = P[S.sel];
+    aboutEdit = e.p; aboutDraft = aboutText(e);
+    renderDetail(e, true);
+    const ta = $("d-about"); if (ta) { ta.focus({ preventScroll: true }); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    return;
+  }
+  if (t.closest("[data-aboutsave]") && S.sel != null) { aboutSave(P[S.sel], $("d-about") ? $("d-about").value : aboutDraft); return; }
+  if (t.closest("[data-aboutreset]") && S.sel != null) { aboutSave(P[S.sel], ""); return; }
+  if (t.closest("[data-aboutcancel]") && S.sel != null) { aboutEdit = null; renderDetail(P[S.sel], true); return; }
   const op = t.closest("[data-open]");
   if (op) { const i = entryIdx(op.dataset.open, op.dataset.ac); if (i != null) openDetail(i); return; }
   const df = t.closest("[data-dfig]");
@@ -4805,6 +4852,7 @@ document.addEventListener("submit", (ev) => {
 });
 document.addEventListener("input", (ev) => {
   const t = ev.target;
+  if (t.id === "d-about") { aboutDraft = t.value; return; }
   draftLater(t);   // typed in a form: kept as a draft until it is saved
   if (t.id === "sf-serial" || t.dataset.xf === "serial") { sfKeep(); sfHeads(); return; }
   if (t.id === "sf-pn") {
@@ -4832,6 +4880,7 @@ document.addEventListener("change", (ev) => {
   if (t.id === "sc-photo") { scanPhoto(t.files && t.files[0]); t.value = ""; return; }
   if (t.id === "sync-file") { readSyncFile(t.files && t.files[0]); t.value = ""; return; }
   if (t.id && t.id.startsWith("co-")) return;
+  if (t.id === "d-about") return;
   if (t.id === "d-note") { setRec(t.dataset.pn, { note: t.value.trim().slice(0, 500) }); }
   else if (t.id === "d-qty") { setQty(P[S.sel].p, +t.value); t.value = rec(P[S.sel].p).qty; }
   else orderChange(t);
