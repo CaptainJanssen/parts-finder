@@ -1792,6 +1792,7 @@ function aboutHtml(e) {
   if (!t && !canEdit) return "";
   return '<div class="aboutbox">' + (t ? '<p class="abouttext">' + esc(t) + "</p>" : '<p class="abouttext none">No description yet.</p>') +
     '<div class="aboutmeta">' + (own ? "<span>Your description</span>" : "") +
+    (t ? '<button class="linkbtn2" type="button" data-copy="' + esc(t) + '">Copy</button>' : "") +
     (canEdit ? '<button class="linkbtn2" type="button" data-aboutedit>' + (t ? "Edit" : "Add a description") + "</button>" : "") + "</div></div>";
 }
 function aboutSave(e, text) {
