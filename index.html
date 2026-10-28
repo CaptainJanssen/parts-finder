@@ -915,7 +915,7 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
         <button id="dadd" class="bigsearch daddbtn" type="button" data-dpicker aria-label="Add a part to request for stock">Add a part</button>
       </div>
-      <button class="btn bigbtn dact" type="button" data-dexport="all" id="d-export">Export</button><button class="btn bigbtn dact" type="button" data-dcopy="all" id="d-copy">Copy</button><button class="btn primary bigbtn dact rwonly" type="button" data-dsent="sel" id="d-mark">Mark requested</button>
+      <button class="btn bigbtn dact" type="button" data-dexport="all" id="d-export">PDF</button><button class="btn bigbtn dact" type="button" data-dcopy="all" id="d-copy">Copy</button><button class="btn primary bigbtn dact rwonly" type="button" data-dsent="sel" id="d-mark">Mark requested</button>
       </div>
     </div>
     </div>
@@ -2831,7 +2831,7 @@ function renderOrders() {
   const todoKeys = new Set(dismGroups("todo").flatMap((g) => g.items.map((x) => x.k)));
   for (const k of [...L.dsel]) if (!todoKeys.has(k)) L.dsel.delete(k);
   const ns = L.dsel.size, cnt = ns ? " (" + ns + ")" : "";
-  $("d-export").textContent = "Export" + cnt; $("d-export").disabled = !todoN;
+  if (!dismPdfBusy) { $("d-export").textContent = "PDF" + cnt; $("d-export").disabled = !todoN; }
   $("d-copy").textContent = "Copy" + cnt; $("d-copy").disabled = !todoN;
   $("d-mark").textContent = "Mark requested" + cnt; $("d-mark").disabled = !ns;
   $("olist").innerHTML = L.tab === "orders" ? ordersHtml(ro) : dismHtml(ro);
@@ -2983,7 +2983,7 @@ function dismHtml(ro) {
     return { open, attrs: ' data-dtog="' + esc(id) + '" role="button" tabindex="0" aria-expanded="' + open + '"', count: '<span class="muted dcount">' + n + (n === 1 ? " part" : " parts") + "</span>", chev: '<span class="chev" aria-hidden="true">' + (open ? "▴" : "▾") + "</span>" };
   };
   h += todo.map((g) => { const f = fold("todo", g); return '<div class="results dgroup' + (f.open ? "" : " shut") + '"><div class="dhead"' + f.attrs + ">" + (ro ? "" : chk(groupState(g.items), 'data-dselg="' + esc(g.key) + '"', "Select " + g.label)) + "<b>" + esc(g.label) + "</b>" + (g.sub ? '<span class="muted">' + esc(g.sub) + "</span>" : "") + f.count + '<span class="sp"></span>' +
-    '<button class="btn small" type="button" data-dexport="' + esc(g.key) + '">Export</button>' + f.chev + "</div>" +
+    '<button class="btn small" type="button" data-dexport="' + esc(g.key) + '">PDF</button>' + f.chev + "</div>" +
     (f.open ? head(true) + g.items.map((x) => dismLine(x, ro, true, chk)).join("") : "") + "</div>"; }).join("");
   if (!todo.length) h += '<div class="results"><div class="empty"><h3>Nothing to request</h3></div></div>';
   if (sent.length) {
@@ -3273,7 +3273,7 @@ function orderClick(t) {
     toast(n + " part" + (n === 1 ? "" : "s") + " marked requested");
     return true;
   }
-  if ((b = q("[data-dexport]"))) { const key = b.dataset.dexport; const g = key === "all" ? null : dismGroups("todo").find((x) => x.key === key); doExport(dismRows(key, key === "all" ? L.dsel : null), "Request", "Request " + (g ? g.label : "dismantler")); return true; }
+  if ((b = q("[data-dexport]"))) { if (!b.disabled) exportDismPdf(b.dataset.dexport, b); return true; }
   if ((b = q("[data-dcopy]"))) { copyText(dismRows("all", L.dsel).map((r) => [r["Part number"], r["Description"], r["Aircraft"], "qty " + r["Qty wanted"], r["Alternate part numbers"] ? "alt. " + r["Alternate part numbers"] : ""].filter(Boolean).join("\t")).join("\n")); return true; }
   // picking parts: the checkbox, a whole group, everything, or a click anywhere on the line
   if ((b = q("[data-dselclear]"))) { L.dsel.clear(); renderOrders(); return true; }
@@ -4469,6 +4469,296 @@ async function exportStockPdf(btn) {
   } catch (err) {
     toast(String(err && err.message).includes("load") ? "The PDF maker could not be loaded. Close the program and open it again." : "The PDF could not be made.");
   } finally { btn.disabled = false; btn.textContent = lab; }
+}
+/* ---------- The request for the dismantler (A4 PDF) ----------
+   The parts - part number, description, aircraft, qty and alternate part numbers; no prices, customers or order codes -
+   each with the number of an IPC drawing after the list: one picture per panel that shows the panel and where it sits
+   in the aircraft, the requested parts circled in red where the finder found their item number. */
+function dismPdfItems(key, only) {
+  const by = new Map();
+  dismGroups("todo").filter((g) => key === "all" || g.key === key).forEach((g) => g.items.filter((x) => !only || !only.size || only.has(x.k)).forEach((x) => {
+    const e = entryOf(x.pn, x.ac);
+    const acs = x.ac ? [x.ac] : acsOf(x.pn);
+    const k = x.pn + "|" + acs.join(",");
+    if (by.has(k)) { by.get(k).qty += x.qty; return; }
+    const own = e && (!x.ac || e.ac === x.ac) ? e : null;   // the drawing must be of the aircraft asked for
+    by.set(k, { pn: x.pn, desc: x.desc || (e ? e.d : ""), acLabel: acs.map(acName).join(", "), qty: x.qty, alts: e ? e.a || [] : [], e: own, where: own && own.ab ? own.ab : "" });
+  }));
+  return [...by.values()];
+}
+const figTitleOf = (e, ref) => { const o = e.o.find((x) => FIGS[x[0]][0] === ref); return o ? FIGS[o[0]][1] : ""; };
+// an Airbus panel's own drawing shows its face only; the drawing of its frame has the cockpit view with an arrow to it
+function vuFrameOf(e) {
+  const m = [e.d, ...(e.n || [])].join(" ").match(/\b(\d{2,4}VU)\b/);
+  if (!m) return null;
+  const rx = new RegExp("^PANEL FRAME-" + m[1] + "\\b");
+  return P.find((x) => x.ac === e.ac && x !== e && rx.test(x.d)) || null;
+}
+// the drawings that could go with a part, best first: the panel and where it is. Boeing: sheet 1 of a figure carries the
+// flight deck locator, so the part circled on sheet 1, or its own figure; the panel figures (chapters 25, 31 and 53)
+// before the system ones. Airbus: the equipment and structure installations have the cockpit view; a VU panel
+// otherwise gets the drawing of its frame. Placard figures come last. score: whole number = class, fraction = taste.
+async function dismCands(e) {
+  if (!e || !DRAWN.includes(e.ac)) return [];
+  const idx = await drawIndex(e.ac);
+  if (!idx || idx.__err != null) return [];
+  const ab = /^A3/.test(e.ac);
+  const cands = drawViews(e, idx).map((v) => ({ v, title: figTitleOf(e, v.ref), frame: null }));
+  const fr = ab ? vuFrameOf(e) : null;
+  if (fr) drawViews(fr, idx).forEach((v) => cands.push({ v, title: figTitleOf(fr, v.ref), frame: fr }));
+  return cands.map((c, i) => {
+    const v = c.v, t = c.title, inst = /EQUIPMENT INSTL|STRUCTURE INSTL/.test(t);
+    let s;
+    if (c.frame) s = 1;
+    else if (ab) s = inst ? (v.found ? 0 : 2) : v.found ? 3 : v.top ? 4 : 5;
+    else s = v.hits[0] && v.hits[0].length ? 0 : v.top ? 2 : v.found ? 3 : 5;
+    if (!ab && !/^(25|31|53)-/.test(v.ref)) s += 0.25;
+    if (/PLACARD|MARKING/.test(t)) s += 0.5;
+    const hitAt = v.hits.findIndex((h) => h.length);
+    const sheet = c.frame || v.top || hitAt < 0 || (!ab && v.hits[0].length) ? 0 : hitAt;
+    const hits = c.frame ? [] : v.hits[sheet] || [];
+    const sh = v.sheets[sheet];
+    // Boeing: a part drawn only on a later sheet gets sheet 1 next to it, for the flight deck view
+    return { s, i, key: e.ac + "|" + v.ref + "|" + sheet, ac: e.ac, ref: v.ref, sheet, nsheets: v.sheets.length, sh, loc: !ab && sheet > 0 ? v.sheets[0] : null,
+      items: c.frame ? [] : hits.length ? hits : v.top ? [] : v.items, boxes: hits.flatMap((n) => (sh[6] && sh[6][n]) || []),
+      frame: c.frame ? c.frame.d.replace(/^PANEL FRAME-/, "").split(",")[0] : "" };
+  }).sort((x, y) => x.s - y.s || x.i - y.i);
+}
+// a drawing sheet as a JPEG for the PDF, the requested items circled in red
+async function sheetJpeg(ac, sh, boxes, maxW, q) {
+  const img = new Image();
+  img.src = await sheetUrl(ac, sh);
+  await img.decode();
+  const W0 = img.naturalWidth || sh[3], H0 = img.naturalHeight || sh[4];
+  const s = Math.min(1, maxW / W0);
+  const c = document.createElement("canvas");
+  c.width = Math.round(W0 * s); c.height = Math.round(H0 * s);
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(img, 0, 0, c.width, c.height);
+  const kx = c.width / sh[3], ky = c.height / sh[4];
+  g.strokeStyle = "#d42020"; g.lineWidth = Math.max(3, 7 * kx);
+  boxes.forEach(([x, y, w, h]) => { g.beginPath(); g.ellipse((x + w / 2) * kx, (y + h / 2) * ky, (w + 36) / 2 * kx, (h + 28) / 2 * ky, 0, 0, Math.PI * 2); g.stroke(); });
+  const blob = await new Promise((res) => c.toBlob(res, "image/jpeg", q));
+  if (!blob) throw new Error("no image");
+  return { bytes: new Uint8Array(await blob.arrayBuffer()), w: c.width, h: c.height };
+}
+async function buildDismPdf(items, opt, progress) {
+  const PL = await loadPdfLib();
+  const { PDFDocument, StandardFonts, rgb } = PL;
+  const C = company;
+  // ---- the drawings first: one per panel. Among a part's best drawings, the one most of the other parts can use
+  // too (the P5 modules all on the overhead panel drawing); parts on the same sheet share it
+  const lists = [];
+  for (let i = 0; i < items.length; i++) {
+    items[i].fig = 0; items[i].figItems = [];
+    if (progress) progress(i, items.length * 2);
+    try { lists.push(await dismCands(items[i].e)); } catch (_) { lists.push([]); }
+  }
+  const best = (l) => l.filter((x) => Math.floor(x.s) === Math.floor(l[0].s));
+  const freq = new Map();
+  lists.forEach((l) => { if (l.length) new Set(best(l).map((x) => x.key)).forEach((k) => freq.set(k, (freq.get(k) || 0) + 1)); });
+  const figs = [], figBy = new Map();
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i], l = lists[i];
+    if (!l.length) continue;
+    const f = best(l).sort((x, y) => freq.get(y.key) - freq.get(x.key) || x.s - y.s || x.i - y.i)[0];
+    const k = f.key;
+    if (!figBy.has(k)) { figBy.set(k, { ...f, boxes: [], parts: [] }); figs.push(figBy.get(k)); }
+    const g = figBy.get(k);
+    g.boxes.push(...f.boxes);
+    g.parts.push(it);
+    it.figItems = f.items;
+  }
+  const doc = await PDFDocument.create();
+  for (let i = 0; i < figs.length; i++) {
+    if (progress) progress(figs.length + i, figs.length * 2);
+    const f = figs[i];
+    try { const j = await sheetJpeg(f.ac, f.sh, f.boxes, opt.maxW, opt.q); f.img = await doc.embedJpg(j.bytes); f.iw = j.w; f.ih = j.h; }
+    catch (_) { f.img = null; }
+    if (f.img && f.loc) {
+      try { const j = await sheetJpeg(f.ac, f.loc, [], opt.maxW * 0.75, opt.q); f.limg = await doc.embedJpg(j.bytes); f.lw = j.w; f.lh = j.h; }
+      catch (_) { f.limg = null; }
+    }
+  }
+  const shown = figs.filter((f) => f.img);
+  shown.forEach((f, i) => { f.no = i + 1; f.parts.forEach((it) => { it.fig = f.no; }); });
+
+  const F = await doc.embedFont(StandardFonts.Helvetica), B = await doc.embedFont(StandardFonts.HelveticaBold);
+  let logo = null;
+  if (C.logo && C.logoW && C.logoH) { try { const by = dataUrlBytes(C.logo); logo = C.logo.startsWith("data:image/png") ? await doc.embedPng(by) : await doc.embedJpg(by); } catch (_) { logo = null; } }
+  const PW = 595.28, H = 841.89, M = 40, R = PW - M;   // A4
+  const INK = rgb(0.1, 0.12, 0.15), MUTED = rgb(0.42, 0.45, 0.5), FAINT = rgb(0.64, 0.67, 0.71), LINE = rgb(0.86, 0.88, 0.9),
+    BAND = rgb(0.953, 0.96, 0.968), ACC = rgb(0.07, 0.2, 0.32), RED = rgb(0.83, 0.13, 0.13);
+  const date = dateNl(today());
+  const pages = [];
+  let page = null;
+  const tw = (s, size, f = F) => f.widthOfTextAtSize(pdfText(s), size);
+  const txt = (s, x, y, size, f = F, color = INK) => { const v = pdfText(s); if (v.trim()) page.drawText(v, { x, y, size, font: f, color }); };
+  const rtxt = (s, xr, y, size, f = F, color = INK) => txt(s, xr - tw(s, size, f), y, size, f, color);
+  const spacedW = (s, size, f, sp) => [...pdfText(s)].reduce((w, ch) => w + tw(ch, size, f) + sp, 0) - sp;
+  const spaced = (s, x, y, size, f, color, sp) => { for (const ch of pdfText(s)) { txt(ch, x, y, size, f, color); x += tw(ch, size, f) + sp; } };
+  const label = (s, x, y) => spaced(s.toUpperCase(), x, y, 6.8, B, MUTED, 0.8);
+  const rlabel = (s, xr, y) => label(s, xr - spacedW(s.toUpperCase(), 6.8, B, 0.8), y);
+  const rule = (y, color = LINE, th = 0.6) => page.drawLine({ start: { x: M, y }, end: { x: R, y }, thickness: th, color });
+  const wrap = (s, maxW, size, f = F) => {
+    const out = [];
+    let line = "";
+    for (const word of String(s || "").split(/\s+/).filter(Boolean)) {
+      const next = line ? line + " " + word : word;
+      if (tw(next, size, f) <= maxW) { line = next; continue; }
+      if (line) out.push(line);
+      line = word;
+      while (tw(line, size, f) > maxW && line.length > 1) { let k = line.length - 1; while (k > 1 && tw(line.slice(0, k), size, f) > maxW) k--; out.push(line.slice(0, k)); line = line.slice(k); }
+    }
+    if (line) out.push(line);
+    return out;
+  };
+  const pnWrap = (pn, w, size) => wrap(pn.replace(/-/g, "- "), w, size, B).map((l) => l.replace(/- /g, "-"));   // a long part number breaks after a dash
+  const newPage = () => {
+    page = doc.addPage([PW, H]); pages.push(page);
+    page.drawRectangle({ x: 0, y: H - 6, width: PW, height: 6, color: ACC });
+    if (pages.length === 1) return 0;
+    if (C.name) txt(C.name, M, H - 40, 10, B, INK);
+    rtxt("Parts request  ·  " + date, R, H - 40, 10, B, ACC);
+    rule(H - 52);
+    return H - 76;
+  };
+
+  // ---- header: you (left), the request (right)
+  newPage();
+  let ly = H - 50;
+  if (logo) {
+    const s = Math.min(180 / C.logoW, 56 / C.logoH);
+    const w = C.logoW * s, h = C.logoH * s;
+    page.drawImage(logo, { x: M, y: H - 36 - h, width: w, height: h });
+    ly = H - 36 - h - 20;
+    if (C.name) { txt(C.name, M, ly, 9.5, B, INK); ly -= 13; }
+  } else if (C.name) {
+    txt(C.name, M, H - 62, 18, B, INK);
+    ly = H - 82;
+  }
+  const coLines = (C.address ? C.address.split(/\n/) : []);
+  const reach = [C.email, C.phone, C.website].filter(Boolean);
+  if (reach.length) coLines.push(reach.join("  ·  "));
+  coLines.forEach((l) => { if (l.trim()) { txt(l, M, ly, 8.8, F, MUTED); ly -= 12; } });
+  const title = "PARTS REQUEST";
+  spaced(title, R - spacedW(title, 23, B, 3), H - 66, 23, B, ACC, 3);
+  const meta = [["Date", date], ["Part numbers", String(new Set(items.map((r) => r.pn)).size)], ["Units", String(items.reduce((s, r) => s + r.qty, 0))], ["Figures", String(shown.length)]];
+  let my = H - 92;
+  meta.forEach(([k, v]) => { txt(k, R - 170, my, 8.8, F, MUTED); rtxt(v, R, my, 8.8, B, INK); my -= 13.5; });
+  let y = Math.min(ly, my) - 12;
+  if (shown.length) {
+    wrap("The figure column refers to the IPC drawings after this list. Each drawing shows the part and where it sits in the aircraft; the requested parts are circled in red.", R - M, 8.6)
+      .forEach((l) => { txt(l, M, y, 8.6, F, MUTED); y -= 11.5; });
+    y -= 4;
+  }
+  rule(y); y -= 24;
+
+  // ---- the parts
+  const COL = { pn: M + 6, pnW: 90, d: M + 102, dW: 168, ac: M + 278, acW: 66, q: M + 372, alt: M + 386, altW: 84, fig: M + 478 };
+  const thead = () => {
+    page.drawRectangle({ x: M, y: y - 9, width: R - M, height: 24, color: BAND });
+    label("Part number", COL.pn, y); label("Description", COL.d, y); label("Aircraft", COL.ac, y);
+    rlabel("Qty", COL.q, y); label("Alternates", COL.alt, y); label("Figure", COL.fig, y);
+    y -= 27;
+  };
+  thead();
+  const SZ = 8.8, LH = 11.2, SM = 7.6, SLH = 9.6;
+  items.forEach((r) => {
+    const pl = pnWrap(r.pn, COL.pnW, SZ);
+    const dl = wrap(r.desc || "–", COL.dW, SZ);
+    const wl = r.where ? wrap(r.where, COL.dW, SM) : [];
+    const al = wrap(r.acLabel || "–", COL.acW, SZ);
+    const xl = r.alts.length ? wrap(r.alts.join(", "), COL.altW, SM) : [];
+    const fl = r.fig ? ["Fig. " + r.fig] : ["–"];
+    const il = r.fig && r.figItems.length ? wrap("item " + r.figItems.join(", "), R - COL.fig - 4, SM) : [];
+    const hgt = Math.max(pl.length * LH, dl.length * LH + wl.length * SLH, al.length * LH, xl.length * SLH, LH + il.length * SLH) - LH + 20;
+    if (y - hgt < 64) { y = newPage(); thead(); }
+    pl.forEach((p, k) => txt(p, COL.pn, y - LH * k, SZ, B, INK));
+    dl.forEach((p, k) => txt(p, COL.d, y - LH * k, SZ, F, INK));
+    wl.forEach((p, k) => txt(p, COL.d, y - LH * dl.length - SLH * k + 1, SM, F, MUTED));
+    al.forEach((p, k) => txt(p, COL.ac, y - LH * k, SZ, F, INK));
+    rtxt(String(r.qty), COL.q, y, SZ, B, INK);
+    xl.forEach((p, k) => txt(p, COL.alt, y - SLH * k, SM, F, INK));
+    txt(fl[0], COL.fig, y, SZ, B, r.fig ? ACC : FAINT);
+    il.forEach((p, k) => txt(p, COL.fig, y - LH - SLH * k + 1, SM, F, MUTED));
+    y -= hgt - 13;
+    rule(y);
+    y -= 13;
+  });
+
+  // ---- the drawings, one per page
+  shown.forEach((f) => {
+    y = newPage();
+    txt("Figure " + f.no, M, y, 16, B, ACC);
+    rtxt(acName(f.ac) + "  ·  IPC " + figLabel(f.ref) + (f.nsheets > 1 ? ", sheet " + (f.sheet + 1) : ""), R, y + 2, 8.6, F, MUTED);
+    y -= 20;
+    f.parts.forEach((it) => {
+      const head = it.pn + (it.figItems.length ? "  ·  item " + it.figItems.join(", ") : "");
+      txt(head, M, y, 9.2, B, INK);
+      const rest = wrap(it.where || it.desc, R - M - tw(head, 9.2, B) - 14, 8.6);
+      if (rest.length) txt(rest[0] + (rest.length > 1 ? " …" : ""), M + tw(head, 9.2, B) + 14, y, 8.6, F, MUTED);
+      y -= 13;
+    });
+    if (f.frame) { wrap("The panel itself is not drawn on this sheet: it shows the frame of " + f.frame + ", with the cockpit view pointing to where it sits.", R - M, 8.2).forEach((l) => { txt(l, M, y, 8.2, F, MUTED); y -= 11; }); }
+    else if (f.boxes.length) { txt("Circled in red: the requested part" + (f.parts.length > 1 ? "s" : "") + " (marked automatically – check the item number).", M, y, 8.2, F, RED); y -= 11; }
+    y -= 6;
+    const put = (img, iw, ih, x0, boxW, top, boxH) => {
+      const s = Math.min(boxW / iw, boxH / ih);
+      const w = iw * s, h = ih * s, x = x0 + (boxW - w) / 2;
+      page.drawImage(img, { x, y: top - h, width: w, height: h });
+      page.drawRectangle({ x, y: top - h, width: w, height: h, borderColor: LINE, borderWidth: 0.6 });
+    };
+    if (y - 62 < 120) return;
+    if (f.limg) {
+      // where it is (sheet 1, with the flight deck view) above, the part itself (the sheet it is circled on) larger below
+      const room = y - 62 - 30, topH = room * 0.4;
+      label("Where it is - sheet 1", M, y);
+      put(f.limg, f.lw, f.lh, M, R - M, y - 9, topH);
+      y -= 9 + topH + 14;
+      label("The part - sheet " + (f.sheet + 1), M, y);
+      put(f.img, f.iw, f.ih, M, R - M, y - 9, y - 9 - 62);
+    } else put(f.img, f.iw, f.ih, M, R - M, y, y - 62);
+  });
+
+  // ---- footer on every page: who you are, and the page number
+  const foot = [C.name, C.email, C.phone, C.website].filter(Boolean).join("   ·   ");
+  pages.forEach((pg, i) => {
+    page = pg;
+    rule(46);
+    if (foot) wrap(foot, R - M - 90, 7.4).forEach((p, k) => txt(p, M, 33 - 10 * k, 7.4, F, MUTED));
+    rtxt("Page " + (i + 1) + " of " + pages.length, R, 33, 7.4, F, FAINT);
+  });
+  doc.setTitle("Parts request " + date);
+  if (C.name) doc.setAuthor(C.name);
+  doc.setCreator("Cockpit Parts Finder");
+  return doc.save();
+}
+var dismPdfBusy = false;   // var: render() reads it before this line runs
+async function exportDismPdf(key, btn) {
+  if (dismPdfBusy) return;
+  if (Backend.local && !Backend.stockPdf) { toast("Close the program and open it again first."); return; }
+  const items = dismPdfItems(key, key === "all" ? L.dsel : null);
+  if (!items.length) { toast("Nothing to export."); return; }
+  const lab = btn.textContent;
+  dismPdfBusy = true;
+  btn.disabled = true;
+  const show = (i, n) => { btn.textContent = "Making PDF… " + Math.min(100, Math.round((i / Math.max(1, n)) * 100)) + "%"; };
+  show(0, 1);
+  try {
+    // the program takes PDFs up to 20 MB: a long list gets smaller drawings
+    let bytes = null;
+    for (const opt of [{ maxW: 1500, q: 0.8 }, { maxW: 1150, q: 0.62 }, { maxW: 900, q: 0.5 }]) {
+      bytes = await buildDismPdf(items.map((x) => ({ ...x })), opt, show);
+      if (bytes.length < 19e6) break;
+    }
+    if (bytes.length >= 19e6) { toast("Too many drawings for one PDF; select fewer parts."); return; }
+    const msg = await Backend.savePdf("stock", "Parts request " + today(), bytes);
+    if (msg) toast(msg);
+  } catch (err) {
+    toast(String(err && err.message).includes("load") ? "The PDF maker could not be loaded. Close the program and open it again." : "The PDF could not be made.");
+  } finally { dismPdfBusy = false; btn.disabled = false; btn.textContent = lab; }
 }
 async function doExport(rows, sheet, name) {
   if (!rows.length) { toast("Nothing to export."); return; }
