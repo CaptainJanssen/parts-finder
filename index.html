@@ -4589,7 +4589,7 @@ async function buildDismPdf(items, opt, progress) {
   if (C.logo && C.logoW && C.logoH) { try { const by = dataUrlBytes(C.logo); logo = C.logo.startsWith("data:image/png") ? await doc.embedPng(by) : await doc.embedJpg(by); } catch (_) { logo = null; } }
   const PW = 595.28, H = 841.89, M = 40, R = PW - M;   // A4
   const INK = rgb(0.1, 0.12, 0.15), MUTED = rgb(0.42, 0.45, 0.5), FAINT = rgb(0.64, 0.67, 0.71), LINE = rgb(0.86, 0.88, 0.9),
-    BAND = rgb(0.953, 0.96, 0.968), ACC = rgb(0.07, 0.2, 0.32), RED = rgb(0.83, 0.13, 0.13);
+    BAND = rgb(0.953, 0.96, 0.968), ACC = rgb(0.07, 0.2, 0.32);
   const date = dateNl(today());
   const pages = [];
   let page = null;
@@ -4644,15 +4644,10 @@ async function buildDismPdf(items, opt, progress) {
   coLines.forEach((l) => { if (l.trim()) { txt(l, M, ly, 8.8, F, MUTED); ly -= 12; } });
   const title = "PARTS REQUEST";
   spaced(title, R - spacedW(title, 23, B, 3), H - 66, 23, B, ACC, 3);
-  const meta = [["Date", date], ["Part numbers", String(new Set(items.map((r) => r.pn)).size)], ["Units", String(items.reduce((s, r) => s + r.qty, 0))], ["Figures", String(shown.length)]];
+  const meta = [["Date", date], ["Part numbers", String(new Set(items.map((r) => r.pn)).size)]];
   let my = H - 92;
   meta.forEach(([k, v]) => { txt(k, R - 170, my, 8.8, F, MUTED); rtxt(v, R, my, 8.8, B, INK); my -= 13.5; });
   let y = Math.min(ly, my) - 12;
-  if (shown.length) {
-    wrap("The figure column refers to the IPC drawings after this list. Each drawing shows the part and where it sits in the aircraft; the requested parts are circled in red.", R - M, 8.6)
-      .forEach((l) => { txt(l, M, y, 8.6, F, MUTED); y -= 11.5; });
-    y -= 4;
-  }
   rule(y); y -= 24;
 
   // ---- the parts
@@ -4701,8 +4696,6 @@ async function buildDismPdf(items, opt, progress) {
       if (rest.length) txt(rest[0] + (rest.length > 1 ? " …" : ""), M + tw(head, 9.2, B) + 14, y, 8.6, F, MUTED);
       y -= 13;
     });
-    if (f.frame) { wrap("The panel itself is not drawn on this sheet: it shows the frame of " + f.frame + ", with the cockpit view pointing to where it sits.", R - M, 8.2).forEach((l) => { txt(l, M, y, 8.2, F, MUTED); y -= 11; }); }
-    else if (f.boxes.length) { txt("Circled in red: the requested part" + (f.parts.length > 1 ? "s" : "") + " (marked automatically – check the item number).", M, y, 8.2, F, RED); y -= 11; }
     y -= 6;
     const put = (img, iw, ih, x0, boxW, top, boxH) => {
       const s = Math.min(boxW / iw, boxH / ih);
@@ -4714,10 +4707,10 @@ async function buildDismPdf(items, opt, progress) {
     if (f.limg) {
       // where it is (sheet 1, with the flight deck view) above, the part itself (the sheet it is circled on) larger below
       const room = y - 62 - 30, topH = room * 0.4;
-      label("Where it is - sheet 1", M, y);
+      label("Location", M, y);
       put(f.limg, f.lw, f.lh, M, R - M, y - 9, topH);
       y -= 9 + topH + 14;
-      label("The part - sheet " + (f.sheet + 1), M, y);
+      label("Part", M, y);
       put(f.img, f.iw, f.ih, M, R - M, y - 9, y - 9 - 62);
     } else put(f.img, f.iw, f.ih, M, R - M, y, y - 62);
   });
