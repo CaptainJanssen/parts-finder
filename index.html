@@ -943,7 +943,7 @@ const acShort = (id) => (AC[id] ? AC[id].short : id === "OTHER" ? "Other type" :
 const acName = (id) => (AC[id] ? AC[id].name : id === "OTHER" ? "Other aircraft type" : id || "");
 const AC_OPTIONS = [...ACS.map((a) => [a.id, a.name]), ["OTHER", "Other aircraft type"]];
 function secTitle(ac, sec) { const a = AC[ac]; return (a && a.sections[sec] && a.sections[sec].title) || sec; }
-const CAT_SHORT = { install: "Installation", panel: "Panel part", instr: "Instrument", control: "Control", light: "Light", placard: "Placard", furn: "Furnishing", elec: "Electrical", struct: "Structure", hw: "Hardware", other: "Other" };
+const CAT_SHORT = { install: "Installation", panel: "Panel part", instr: "Instrument", avionics: "Avionics unit", control: "Control", light: "Light", placard: "Placard", furn: "Furnishing", elec: "Electrical", struct: "Structure", hw: "Hardware", other: "Other" };
 const $ = (id) => document.getElementById(id);
 const MAIN = document.querySelector("main.wrap");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -987,7 +987,7 @@ function tierOf(e) {
   // a panel in a floor, ceiling or lining installation is a lining panel
   if ((b === "PANEL" || b === "PANEL ASSY") && e.o.every((o) => LINING_PAR.test((PARENTS[o[2]] || "") + " | " + FIGS[o[0]][1]))) return 3;
   if (b === "PANEL") return e.o.some((o) => { const par = PARENTS[o[2]] || ""; return !par || /\bINSTL\b/.test(par); }) ? 1 : 3;
-  if (TIER1.test(b) || e.c === "instr") return 1;
+  if (TIER1.test(b) || e.c === "instr" || e.c === "avionics") return 1;
   if (e.c === "control" || /^(LIGHT ASSY|LIGHT|SWITCH|SWITCH ASSY|DIMMER)/.test(b)) return 2;
   if (e.c === "panel" || e.c === "light" || e.c === "placard" || e.c === "furn") return 3;
   return 4;
@@ -1034,6 +1034,10 @@ function entryIdx(pn, ac) {
   return list[0];
 }
 function entryOf(pn, ac) { const i = entryIdx(pn, ac); return i == null ? null : P[i]; }
+// a part number the IPC gives only as an alternate (C13043AA04 after a service bulletin): the unit it belongs to
+const byAlt = new Map();
+P.forEach((e, i) => (e.a || []).forEach((a) => { if (!byPn.has(a)) { if (!byAlt.has(a)) byAlt.set(a, []); byAlt.get(a).push(i); } }));
+function altEntryOf(pn, ac) { const l = byAlt.get(pn); if (!l) return null; const i = l.find((k) => P[k].ac === (ac || S.ac)); return P[i != null ? i : l[0]]; }
 function acsOf(pn) { return (byPn.get(pn) || []).map((i) => P[i].ac); }
 const TOTAL = { pns: byPn.size, entries: ACS.reduce((s, a) => s + a.stats.entries, 0) };
 P.forEach((e) => {
@@ -2602,6 +2606,8 @@ async function fillDrawing(e) {
     if (idx && idx.__err === 404 && Backend.local) { box.hidden = false; box.innerHTML = '<h4>Drawing</h4><p class="note">Close the Parts Finder and start it again from the desktop icon to see the IPC drawings.</p>'; }
     return;
   }
+  // a figure without a drawing (an avionics bay installation, say) gets no Drawing button
+  document.querySelectorAll("#detail [data-dfig][data-dscroll]").forEach((b) => { if (!idx[b.dataset.dfig]) b.hidden = true; });
   const views = drawViews(e, idx);
   if (!views.length) { box.hidden = true; return; }
   let st = DRW.sel && DRW.sel.pi === e.idx && views.some((x) => x.ref === DRW.sel.ref) ? DRW.sel : null;
@@ -2776,7 +2782,7 @@ function newOrder(fields) {
   return putOrder({ id: "o" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: today(), status: "open", lines: [], ...fields, no });
 }
 function addLine(o, pn, ac, qty) {
-  const e = entryOf(pn, ac);
+  const e = entryOf(pn, ac) || altEntryOf(pn, ac);
   const lines = o.lines.map((l) => ({ ...l }));
   const have = lines.find((l) => l.pn === pn);
   if (have) have.qty += qty || 1;
@@ -2963,7 +2969,7 @@ function dismGroups(state) {
       items: ls.map(({ l, i }) => ({ pn: l.pn, ac: l.ac, desc: lineDesc(l), qty: l.req, date: l.rdate, k: "o:" + o.id + ":" + i })) });
   });
   const stockItems = listedEntries().filter((x) => (state === "todo" ? !x.r.sent : state === "sent" ? !!x.r.sent : false));
-  if (stockItems.length) groups.push({ key: "stock", label: "For stock", sub: "", items: stockItems.map((x) => ({ pn: x.pn, ac: x.e ? x.e.ac : "", desc: x.e ? x.e.d : "", qty: x.r.qty || 1, date: x.r.sent, k: "s:" + x.pn })) });
+  if (stockItems.length) groups.push({ key: "stock", label: "For stock", sub: "", items: stockItems.map((x) => { const e = x.e || altEntryOf(x.pn); return { pn: x.pn, ac: e ? e.ac : "", desc: e ? e.d : "", qty: x.r.qty || 1, date: x.r.sent, k: "s:" + x.pn }; }) });
   return groups;
 }
 function dismHtml(ro) {
@@ -4477,12 +4483,13 @@ async function exportStockPdf(btn) {
 function dismPdfItems(key, only) {
   const by = new Map();
   dismGroups("todo").filter((g) => key === "all" || g.key === key).forEach((g) => g.items.filter((x) => !only || !only.size || only.has(x.k)).forEach((x) => {
-    const e = entryOf(x.pn, x.ac);
-    const acs = x.ac ? [x.ac] : acsOf(x.pn);
+    const e = entryOf(x.pn, x.ac) || altEntryOf(x.pn, x.ac);
+    const acs = x.ac ? [x.ac] : acsOf(x.pn).length ? acsOf(x.pn) : e ? [e.ac] : [];
     const k = x.pn + "|" + acs.join(",");
     if (by.has(k)) { by.get(k).qty += x.qty; return; }
     const own = e && (!x.ac || e.ac === x.ac) ? e : null;   // the drawing must be of the aircraft asked for
-    by.set(k, { pn: x.pn, desc: x.desc || (e ? e.d : ""), acLabel: acs.map(acName).join(", "), qty: x.qty, alts: e ? e.a || [] : [], e: own, where: own && own.ab ? own.ab : "" });
+    const alts = e ? [e.p, ...(e.a || [])].filter((a) => a !== x.pn) : [];
+    by.set(k, { pn: x.pn, desc: x.desc || (e ? e.d : ""), acLabel: acs.map(acName).join(", "), qty: x.qty, alts, e: own, where: own && own.ab ? own.ab : "" });
   }));
   return [...by.values()];
 }
