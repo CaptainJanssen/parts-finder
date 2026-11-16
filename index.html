@@ -915,7 +915,7 @@ footer.foot { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
         <button id="dadd" class="bigsearch daddbtn" type="button" data-dpicker aria-label="Add a part to request for stock">Add a part</button>
       </div>
-      <button class="btn bigbtn dact" type="button" data-dexport="all" id="d-export">PDF</button><button class="btn bigbtn dact" type="button" data-dcopy="all" id="d-copy">Copy</button><button class="btn primary bigbtn dact rwonly" type="button" data-dsent="sel" id="d-mark">Mark requested</button>
+      <button class="btn bigbtn dact" type="button" data-dexport="all" id="d-export">PDF</button><button class="btn bigbtn dact" type="button" data-dxlsx="all" id="d-xlsx">Excel</button><button class="btn bigbtn dact" type="button" data-dcopy="all" id="d-copy">Copy</button><button class="btn primary bigbtn dact rwonly" type="button" data-dsent="sel" id="d-mark">Mark requested</button>
       </div>
     </div>
     </div>
@@ -2838,6 +2838,7 @@ function renderOrders() {
   for (const k of [...L.dsel]) if (!todoKeys.has(k)) L.dsel.delete(k);
   const ns = L.dsel.size, cnt = ns ? " (" + ns + ")" : "";
   if (!dismPdfBusy) { $("d-export").textContent = "PDF" + cnt; $("d-export").disabled = !todoN; }
+  $("d-xlsx").textContent = "Excel" + cnt; $("d-xlsx").disabled = !todoN;
   $("d-copy").textContent = "Copy" + cnt; $("d-copy").disabled = !todoN;
   $("d-mark").textContent = "Mark requested" + cnt; $("d-mark").disabled = !ns;
   $("olist").innerHTML = L.tab === "orders" ? ordersHtml(ro) : dismHtml(ro);
@@ -2989,7 +2990,7 @@ function dismHtml(ro) {
     return { open, attrs: ' data-dtog="' + esc(id) + '" role="button" tabindex="0" aria-expanded="' + open + '"', count: '<span class="muted dcount">' + n + (n === 1 ? " part" : " parts") + "</span>", chev: '<span class="chev" aria-hidden="true">' + (open ? "▴" : "▾") + "</span>" };
   };
   h += todo.map((g) => { const f = fold("todo", g); return '<div class="results dgroup' + (f.open ? "" : " shut") + '"><div class="dhead"' + f.attrs + ">" + (ro ? "" : chk(groupState(g.items), 'data-dselg="' + esc(g.key) + '"', "Select " + g.label)) + "<b>" + esc(g.label) + "</b>" + (g.sub ? '<span class="muted">' + esc(g.sub) + "</span>" : "") + f.count + '<span class="sp"></span>' +
-    '<button class="btn small" type="button" data-dexport="' + esc(g.key) + '">PDF</button>' + f.chev + "</div>" +
+    '<button class="btn small" type="button" data-dexport="' + esc(g.key) + '">PDF</button><button class="btn small" type="button" data-dxlsx="' + esc(g.key) + '">Excel</button>' + f.chev + "</div>" +
     (f.open ? head(true) + g.items.map((x) => dismLine(x, ro, true, chk)).join("") : "") + "</div>"; }).join("");
   if (!todo.length) h += '<div class="results"><div class="empty"><h3>Nothing to request</h3></div></div>';
   if (sent.length) {
@@ -3059,16 +3060,13 @@ function makeDraft(x, o) {
 }
 // what goes to the dismantler: part number, description, aircraft, how many and the alternate part numbers - nothing else
 // (no order codes, prices or customers). A part wanted for several orders is one line with the quantities added up.
+// the dismantler list as an Excel sheet: the parts of the PDF without the drawings (never prices, customers or order numbers)
 function dismRows(key, only) {
-  const by = new Map();
-  dismGroups("todo").filter((g) => key === "all" || g.key === key).forEach((g) => g.items.filter((x) => !only || !only.size || only.has(x.k)).forEach((x) => {
-    const e = entryOf(x.pn, x.ac);
-    const ac = x.ac ? acName(x.ac) : acsOf(x.pn).map(acName).join(", ");
-    const k = x.pn + "|" + ac;
-    if (by.has(k)) { by.get(k)["Qty wanted"] += x.qty; return; }
-    by.set(k, { "Part number": x.pn, "Description": x.desc, "Aircraft": ac, "Qty wanted": x.qty, "Alternate part numbers": e ? (e.a || []).join(", ") : "" });
+  return dismPdfItems(key, only).map((it) => ({
+    "Part number": it.pn, "Description": it.desc, "Details": it.where, "Aircraft": it.acLabel, "Qty": it.qty,
+    "Alternate part numbers": it.alts.join(", "),
+    "IPC figure": it.e ? [...new Set(it.e.o.map((o) => figLabel(FIGS[o[0]][0]) + (o[1] ? " item " + o[1] : "")))].slice(0, 3).join("; ") : "",
   }));
-  return [...by.values()];
 }
 function orderRows(o) {
   return o.lines.map((l) => ({ "Part number": l.pn, "Description": lineDesc(l), "Aircraft": acName(l.ac), "Qty": l.qty,
@@ -3280,7 +3278,8 @@ function orderClick(t) {
     return true;
   }
   if ((b = q("[data-dexport]"))) { if (!b.disabled) exportDismPdf(b.dataset.dexport, b); return true; }
-  if ((b = q("[data-dcopy]"))) { copyText(dismRows("all", L.dsel).map((r) => [r["Part number"], r["Description"], r["Aircraft"], "qty " + r["Qty wanted"], r["Alternate part numbers"] ? "alt. " + r["Alternate part numbers"] : ""].filter(Boolean).join("\t")).join("\n")); return true; }
+  if ((b = q("[data-dxlsx]"))) { if (!b.disabled) doExport(dismRows(b.dataset.dxlsx, b.dataset.dxlsx === "all" ? L.dsel : null), "Parts request", "Parts request"); return true; }
+  if ((b = q("[data-dcopy]"))) { copyText(dismRows("all", L.dsel).map((r) => [r["Part number"], r["Description"], r["Aircraft"], "qty " + r["Qty"], r["Alternate part numbers"] ? "alt. " + r["Alternate part numbers"] : ""].filter(Boolean).join("\t")).join("\n")); return true; }
   // picking parts: the checkbox, a whole group, everything, or a click anywhere on the line
   if ((b = q("[data-dselclear]"))) { L.dsel.clear(); renderOrders(); return true; }
   if ((b = q("[data-dselg]"))) {
